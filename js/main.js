@@ -22,7 +22,7 @@ let cpu = null, karierIdx = null, calMsg = '', hitstop = 0, frozenFor = 0;
 let trackers = [new Tracker()];
 const mouse = {x: 0, y: .5, z: .5, r: 0, p: 0};
 const mine = {h: {x: 0, y: .5, z: .5, r: 0, p: 0}, g: {x: 0, y: .5, z: .5, r: 0, p: 0}}; // nilai tangan yang dihaluskan per sisi
-const sp = {h: {s: 0, vy: 0}, g: {s: 0, vy: 0}}; // kecepatan ayun bat (m/s) dan komponen tegaknya, dihaluskan
+const sp = {h: {s: 0, vy: 0, vx: 0}, g: {s: 0, vy: 0, vx: 0}}; // kecepatan ayun bat (m/s), komponen tegak dan menyamping (dunia), dihaluskan
 const prevBat = {h: null, g: null};
 const oppShown = {x: 0, y: 1, z: -1.5, r: 0, p: 0}; // bat lawan jaringan, dihaluskan supaya tidak patah-patah
 // tamu: bola prediksi lokal + pukulan yang menunggu konfirmasi host
@@ -204,8 +204,9 @@ function guestTick(dt, own, eye) {
   if (pend || S.paused) return;
   // tamu menilai pukulannya sendiri terhadap bola yang ia lihat, lalu memberi tahu host (pemukul diuntungkan)
   const T = {...S, ...GB, gx: own.x, gy: own.y, gz: own.z, gr: own.r, gp: own.p, gex: eye.x, gey: eye.y, near: {h: null, g: null}};
-  if (!tryHit(T, 'g', {swing: () => ({...sp.g})})) return;
-  const m = {t: 'hit', id: ++hitId, bx: GB.bx, by: GB.by, bz: GB.bz, bat: own, sw: {...sp.g}};
+  let q = null;
+  if (!tryHit(T, 'g', {swing: () => ({...sp.g}), onHit: (s, r) => { q = {dx: r.dx, dy: r.dy, along: r.along}; }})) return;
+  const m = {t: 'hit', id: ++hitId, bx: GB.bx, by: GB.by, bz: GB.bz, bat: own, sw: {...sp.g}, q};
   send(m, 3);
   for (const k in GB) GB[k] = T[k];
   pend = {hits: S.hits + 1, at: performance.now()};
@@ -219,7 +220,8 @@ function hostHit(d) {
   S.bx = d.bx; S.by = d.by; S.bz = d.bz;
   const b = {x: clamp(d.bat.x, -2, 2), y: clamp(d.bat.y, .2, 2), z: clamp(d.bat.z, -1.9, -1), r: clamp(d.bat.r, -1.3, 1.3), p: clamp(d.bat.p, -1.2, 1.2)};
   Object.assign(S, {gx: b.x, gy: b.y, gz: b.z, gr: b.r, gp: b.p});
-  applyHit(S, 'g', b, {s: clamp(+d.sw.s || 0, 0, 6), vy: clamp(+d.sw.vy || 0, -6, 6)});
+  const q = d.q ? {dx: clamp(+d.q.dx || 0, -.3, .3), dy: clamp(+d.q.dy || 0, -.3, .3), along: clamp(+d.q.along || 0, -.2, .45)} : null; // tamu yang menilai kontaknya: host tidak menghitung ulang
+  applyHit(S, 'g', b, {s: clamp(+d.sw.s || 0, 0, 6), vy: clamp(+d.sw.vy || 0, -6, 6), vx: clamp(+d.sw.vx || 0, -6, 6)}, q);
 }
 
 // ---------- kalibrasi, jeda ----------
@@ -320,7 +322,8 @@ addEventListener('wheel', e => { if (screenNow === 'main') mouse.z = clamp(mouse
 cv.addEventListener('pointerdown', () => { if (replay) replay = null; });
 
 // ---------- umpan balik ----------
-const fx = {hits: 0, bounces: 0, smashes: 0, pts: 0, my: -1, op: -1};
+const fx = {hits: 0, bounces: 0, smashes: 0, pts: 0, my: -1, op: -1, cords: 0, edges: 0, lets: 0, shotAt: 0};
+const note = {t: '', until: 0}; // kabar singkat saat reli: net, tepi meja, lob, drop shot
 function onMyHit(T, smash) { // statistik pukulan pemain laptop ini
   const d = {pukulan: 1}; if (T.w > .4) d.topspin = 1; if (smash) d.smash = 1;
   progress(d);
@@ -366,7 +369,7 @@ function flip(id, v, key) {
   fx[key] = v; setText(id, v);
   const e = $(id); e.classList.remove('flip'); void e.offsetWidth; e.classList.add('flip');
 }
-const WHY = {net: 'bola nyangkut di net', out: 'bola keluar meja', own: 'bola memantul di meja sendiri'};
+const WHY = {serve: 'servis harus memantul dulu di meja sendiri', toss: 'lemparan servis tidak terpukul', net: 'bola masuk net', out: 'bola keluar panjang', wide: 'bola melebar keluar meja', own: 'bola memantul di meja sendiri'};
 function missText(m) {
   if (!m || m.d > 5) return 'bola tidak terjangkau. Bawa bat ke jalur bola';
   return Math.abs(m.dx) > Math.abs(m.dy) ? (m.dx > 0 ? 'bat terlalu kiri' : 'bat terlalu kanan') : (m.dy > 0 ? 'bat terlalu rendah' : 'bat terlalu tinggi');
@@ -394,7 +397,8 @@ function hud() {
     else if (S.paused) msg = 'Jeda';
     else if (conn && performance.now() - rxT > 2000) msg = 'Menunggu lawan…';
     else if (S.ph === 'wait') msg = 'Menunggu lawan siap…';
-    else if (S.ph === 'serve') msg = lat ? '' : duo ? (S.srv === 'h' ? 'Servis: pemain kiri' : 'Servis: pemain kanan') : S.srv === me ? 'Servis: pukul bola' : 'Lawan servis';
+    else if (S.ph === 'serve') msg = lat ? '' : duo ? (S.srv === 'h' ? 'Servis: pemain kiri' : 'Servis: pemain kanan') : S.srv === me ? (S.toss ? 'Servis: pukul saat bola turun' : 'Servis: bola akan dilempar') : 'Lawan servis';
+    else if (S.ph === 'point' && S.why === 'let') msg = 'Let: servis menyentuh net, diulang';
     else if (S.ph === 'point') {
       const why = S.why === 'miss' ? (S.miss && S.miss.side === me && !duo ? missText(S.miss) : '') : WHY[S.why];
       if (lat) msg = S.pw === 'h' ? 'Masuk!' : 'Gagal: ' + why;
@@ -402,12 +406,18 @@ function hud() {
       else msg = S.pw === me ? 'Poin untukmu!' : 'Poin lawan' + (why ? ': ' + why : '');
     }
   }
+  if (!msg && S.ph === 'play' && performance.now() < note.until) msg = note.t;
   setText('msg', msg);
 
   // suara, efek, dan statistik dipicu oleh penghitung di keadaan, jadi tamu ikut mendapatkannya
   if (S.hits !== fx.hits && !(pend && S.hits < fx.hits)) { // tamu: pukulan prediksi sudah diberi efek, tunggu konfirmasi host
     if (S.hits > fx.hits) fxHit(S, S.last); fx.hits = S.hits; }
   if (S.bounces !== fx.bounces) { fx.bounces = S.bounces; snd.sBounce(); }
+  const kabar = t => { note.t = t; note.until = performance.now() + 900; };
+  if (S.cords !== fx.cords) { if (S.cords > fx.cords) { snd.sTick(); kabar('Net!'); } fx.cords = S.cords; }
+  if (S.edges !== fx.edges) { if (S.edges > fx.edges) kabar('Bola tepi!'); fx.edges = S.edges; }
+  if (S.lets !== fx.lets) { if (S.lets > fx.lets) snd.sTick(); fx.lets = S.lets; }
+  if (S.hits !== fx.shotAt) { fx.shotAt = S.hits; if (S.shot === 'lob') kabar('Lob'); else if (S.shot === 'drop') kabar('Drop shot'); }
   const pts = S.sl + S.sr;
   if (pts > fx.pts) {
     const win = S.pw === me;
@@ -445,7 +455,7 @@ const toWorld = (side, m, aspect, e) => { const s = side === 'h' ? 1 : -1, b = h
 function measureSwing(dt) { // kecepatan ayun untuk kekuatan pukulan dan spin
   for (const p of ['h', 'g']) {
     const b = batOf(S, p), q = prevBat[p];
-    if (q && dt > 0) { sp[p].s += (Math.hypot(b.x - q.x, b.y - q.y, b.z - q.z) / dt - sp[p].s) * .3; sp[p].vy += ((b.y - q.y) / dt - sp[p].vy) * .3; }
+    if (q && dt > 0) { sp[p].s += (Math.hypot(b.x - q.x, b.y - q.y, b.z - q.z) / dt - sp[p].s) * .3; sp[p].vy += ((b.y - q.y) / dt - sp[p].vy) * .3; sp[p].vx += ((b.x - q.x) / dt - sp[p].vx) * .3; }
     prevBat[p] = b;
   }
 }
@@ -470,6 +480,7 @@ function tick(now) {
   if (conn && now - rxT > 30000) fail('Lawan tidak merespons. Buat room baru atau gabung lagi.');
   const local = role === 'cpu' || role === 'duo' || (role === 'host' && conn);
   if (local && !S.paused && !stale && !calMsg && !replay) {
+    S.err = tut ? 0 : +$('assist').value; S.errG = S.mode === 'latihan' ? 0 : cpu ? S.err * .5 : S.err; // komputer sudah meleset lewat posisi bat, galat kontaknya separuh
     for (const side in own) { setBat(side, own[side]); S[side + 'ex'] = eye[side].x; S[side + 'ey'] = eye[side].y; }
     if (duo) { S.hh = trackers[0].hand; S.gh = trackers[1].hand; } else S.hh = myHand(); // komputer: tangan kanan dari newState
     if (cpu) cpu.think(S, dt);
@@ -531,7 +542,7 @@ function tick(now) {
 const other = p => p === 'h' ? 'g' : 'h';
 let prevOwnG = null;
 function measureSwingGuest(b, dt) {
-  if (prevOwnG && dt > 0) { sp.g.s += (Math.hypot(b.x - prevOwnG.x, b.y - prevOwnG.y, b.z - prevOwnG.z) / dt - sp.g.s) * .3; sp.g.vy += ((b.y - prevOwnG.y) / dt - sp.g.vy) * .3; }
+  if (prevOwnG && dt > 0) { sp.g.s += (Math.hypot(b.x - prevOwnG.x, b.y - prevOwnG.y, b.z - prevOwnG.z) / dt - sp.g.s) * .3; sp.g.vy += ((b.y - prevOwnG.y) / dt - sp.g.vy) * .3; sp.g.vx += ((b.x - prevOwnG.x) / dt - sp.g.vx) * .3; }
   prevOwnG = b;
 }
 function drawPip() {

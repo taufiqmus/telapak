@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {newState, nextServe, startRound, step, applyHit, tryHit, won, fly, backhand, palmPitch, launch, reach, calRange, seg, TY, BR, HIT} from '../js/physics.js';
+import {newState, nextServe, startRound, step, applyHit, tryHit, won, fly, backhand, palmPitch, launch, reach, calRange, seg, TY, BR, HIT, TW, NET_TOP} from '../js/physics.js';
 
 const blocked = {swing: () => ({s: 1, vy: 0}), remote: () => true}; // tidak ada yang bisa memukul
 const run = (S, opt = blocked, max = 2000) => { for (let i = 0; i < max && S.ph === 'play'; i++) step(S, 1 / 120, opt); };
@@ -70,9 +70,9 @@ test('memantul di meja sendiri = poin lawan', () => {
 
 test('pukulan kena bila bat menutupi bola, meleset dicatat sebagai near-miss', () => {
   const swing = {swing: () => ({s: 1, vy: 0})};
-  const S = newState(); Object.assign(S, {ph: 'play', bx: 0, by: 1, bz: 1.5, last: 'g', hx: 0, hy: 1, hz: 1.5});
+  const S = newState(); Object.assign(S, {ph: 'play', bn: 1, bx: 0, by: 1, bz: 1.5, last: 'g', hx: 0, hy: 1, hz: 1.5});
   assert.equal(tryHit(S, 'h', swing), true);
-  const M = newState(); Object.assign(M, {ph: 'play', bx: 0, by: 1, bz: 1.5, last: 'g', hx: .5, hy: 1, hz: 1.5});
+  const M = newState(); Object.assign(M, {ph: 'play', bn: 1, bx: 0, by: 1, bz: 1.5, last: 'g', hx: .5, hy: 1, hz: 1.5});
   assert.equal(tryHit(M, 'h', swing), false);
   assert.ok(M.near.h.d > HIT && M.near.h.dx < 0, 'bola di kiri bat');
 });
@@ -103,7 +103,7 @@ test('ndcToHand: bat tepat di bawah kursor', async () => {
 });
 
 test('sisi jarak jauh tidak dipukul lokal, tapi near-miss-nya tetap dicatat', () => {
-  const S = newState(); Object.assign(S, {ph: 'play', bx: 0, by: 1, bz: -1.5, last: 'h', gx: .4, gy: 1, gz: -1.5});
+  const S = newState(); Object.assign(S, {ph: 'play', bn: 1, bx: 0, by: 1, bz: -1.5, last: 'h', gx: .4, gy: 1, gz: -1.5});
   assert.equal(tryHit(S, 'g', {swing: () => ({s: 1, vy: 0}), remote: s => s === 'g'}), false);
   assert.ok(S.near.g && S.near.g.d > 0);
   S.gx = 0; assert.equal(tryHit(S, 'g', {swing: () => ({s: 1, vy: 0}), remote: s => s === 'g'}), false);
@@ -158,4 +158,109 @@ test('kalibrasi lengkap: rentang pribadi, netral di tengah, sumbu sempit ditolak
   assert.equal(seg(-.25 * .85, R.z), 0); // depan = ujung bawah nilai mentah
   const sempit = calRange(n, {...s, kanan: p(.57, .5, 0), belakang: p(.55, .5, .01)});
   assert.equal(sempit.x, null); assert.equal(sempit.z, null); assert.ok(sempit.y);
+});
+
+// ---------- dinamika: galat kontak, net cord, let, lob, drop, bola tepi, sidespin ----------
+const play = (side = 'h', over = {}) => { const k = side === 'h' ? 1 : -1, S = newState(); Object.assign(S, {ph: 'play', bx: 0, by: 1.05, bz: k * 1.2, last: null}, over); return S; };
+const hitAndRun = (S, side, swing, q) => { applyHit(S, side, {x: 0, y: S.by, z: S.bz, r: 0, p: 0}, swing, q); run(S); return S.why; };
+
+test('galat kontak: bola di bawah bat ke net, di atas keluar panjang, di samping melebar; berbantuan tetap masuk', () => {
+  const sw = {s: 1.5, vy: 0}, edge = .95 * HIT;
+  for (const side of ['h', 'g']) {
+    assert.ok(['net', 'own'].includes(hitAndRun(play(side, {err: 1, errG: 1}), side, sw, {dx: 0, dy: -edge, along: .12}))); // terlalu rendah: ke net atau jatuh di meja sendiri
+    assert.equal(hitAndRun(play(side, {err: 1, errG: 1}), side, sw, {dx: 0, dy: edge, along: .12}), 'out');
+    assert.equal(hitAndRun(play(side, {err: 1, errG: 1}), side, sw, {dx: edge, dy: 0, along: .12}), 'wide');
+    assert.equal(hitAndRun(play(side), side, sw, {dx: 0, dy: -edge, along: .12}), 'miss'); // err 0: tetap masuk
+    assert.equal(hitAndRun(play(side, {err: 1, errG: 1}), side, sw, {dx: .02, dy: -.03, along: .1}), 'miss'); // sweet spot: masuk
+  }
+});
+
+test('galat deterministik: masukan sama = lintasan sama (duel tidak berbeda antar laptop)', () => {
+  const a = play('h', {err: .6}), b = play('h', {err: .6}), q = {dx: .15, dy: -.12, along: .3};
+  applyHit(a, 'h', {x: .1, y: 1, z: 1.2, r: .3, p: .2}, {s: 2, vy: 1, vx: .5}, q);
+  applyHit(b, 'h', {x: .1, y: 1, z: 1.2, r: .3, p: .2}, {s: 2, vy: 1, vx: .5}, q);
+  assert.deepEqual([a.vx, a.vy, a.vz, a.w, a.ws], [b.vx, b.vy, b.vz, b.w, b.ws]);
+});
+
+test('servis menyerempet net lalu masuk = let, skor tetap; serempet lalu balik = net', () => {
+  const S = newState(); startRound(S, 7, 1);
+  Object.assign(S, {ph: 'play', last: 'h', rally: 1, sv: true, sb: 1, bx: 0, by: NET_TOP + .01, bz: .05, vx: 0, vy: -.2, vz: -3, w: 0});
+  run(S); assert.equal(S.why, 'let'); assert.equal(S.sl + S.sr, 0); assert.equal(S.lets, 1); assert.equal(S.cords, 1);
+  const R = newState(); Object.assign(R, {ph: 'play', last: 'h', rally: 3, bx: 0, by: NET_TOP - .005, bz: .02, vx: 0, vy: .24, vz: -.4, w: 0}); // serempetan tebal: balik
+  run(R); assert.equal(R.cords, 1); assert.equal(R.why, 'net'); assert.equal(R.pw, 'g');
+});
+
+test('lob tinggi dan masuk, drop pendek lalu memantul dua kali di meja lawan', () => {
+  const L = play('h'); let top = 0;
+  applyHit(L, 'h', {x: 0, y: .9, z: 1.8, r: 0, p: 0}, {s: 1, vy: 1.5}); assert.equal(L.shot, 'lob');
+  for (let i = 0; i < 2000 && L.ph === 'play'; i++) { step(L, 1 / 120, blocked); top = Math.max(top, L.by); }
+  assert.ok(top > 2, 'puncak lob ' + top.toFixed(2)); assert.equal(L.why, 'miss'); assert.equal(L.pw, 'h');
+  const D = play('h', {bz: 1.1}); let first = null;
+  applyHit(D, 'h', {x: 0, y: 1, z: 1.1, r: 0, p: 0}, {s: .2, vy: 0}); assert.equal(D.shot, 'drop');
+  for (let i = 0; i < 2000 && D.ph === 'play'; i++) { step(D, 1 / 120, blocked); if (first === null && D.bn === 1) first = D.bz; }
+  assert.ok(first < 0 && first > -.6, 'pantulan pertama ' + first); assert.equal(D.why, 'miss'); assert.equal(D.pw, 'h');
+});
+
+test('bola tepi: sah, memantul rendah', () => {
+  const S = newState(); Object.assign(S, {ph: 'play', last: 'h', rally: 3, bx: TW / 2 - .006, by: TY + BR + .05, bz: -1, vx: 0, vy: -1, vz: -1, w: 0});
+  for (let i = 0; i < 40 && S.edges === 0; i++) step(S, 1 / 240, blocked);
+  assert.equal(S.edges, 1); assert.equal(S.bn, 1); assert.ok(S.vy < .5);
+});
+
+test('sidespin: bola membelok tapi tetap mendarat, prediksi tamu ikut', () => {
+  for (const vx of [-4, 4]) for (const side of ['h', 'g']) {
+    const S = play(side); applyHit(S, side, {x: 0, y: 1.05, z: S.bz, r: 0, p: 0}, {s: 1.5, vy: 0, vx}); assert.ok(Math.abs(S.ws) > .3);
+    const B = {...S}; run(S); assert.equal(S.why, 'miss', `vx=${vx} ${side}`);
+  }
+  const S = play('h'); applyHit(S, 'h', {x: 0, y: 1.05, z: 1.2, r: 0, p: 0}, {s: 1.5, vy: 0, vx: 4});
+  const B = {...S};
+  for (let i = 0; i < 120 && S.bn === 0 && S.ph === 'play'; i++) { step(S, 1 / 120, blocked); fly(B, 1 / 120); }
+  assert.ok(Math.abs(S.bx - B.bx) < 1e-9 && Math.abs(S.bz - B.bz) < 1e-9);
+});
+
+test('fly sama dengan simulasi melewati serempetan net', () => {
+  const S = newState(); Object.assign(S, {ph: 'play', last: 'h', rally: 3, bx: 0, by: NET_TOP + .06, bz: .3, vx: .2, vy: .2, vz: -3, w: .2});
+  const B = {...S};
+  for (let i = 0; i < 200 && S.bn === 0 && S.ph === 'play'; i++) { step(S, 1 / 120, blocked); fly(B, 1 / 120); }
+  assert.equal(S.cords, 1); assert.ok(Math.abs(S.bz - B.bz) < 1e-9 && Math.abs(S.by - B.by) < 1e-9);
+});
+
+// ---------- servis asli: lempar, pantul di meja sendiri dulu, tanpa volley ----------
+test('servis berbantuan selalu sah: pantul di meja sendiri, lalu di meja lawan', () => {
+  let n = 0;
+  for (const srv of ['h', 'g']) for (const s of [0, 1, 2.5, 4]) for (const vy of [-3, 0, 3]) for (const p of [-.6, 0, .6]) for (const r of [-1, 0, 1]) for (const vx of [-3, 3]) {
+    const S = newState(); S.sl = srv === 'h' ? 0 : 2; nextServe(S); Object.assign(S, {toss: true, vy: -1});
+    const k = srv === 'h' ? 1 : -1;
+    applyHit(S, srv, {x: 0, y: S.by, z: S.bz, r, p}, {s, vy, vx});
+    let own = 0;
+    for (let i = 0; i < 3000 && S.ph === 'play'; i++) { const b = S.bounces; step(S, 1 / 240, blocked); if (S.bounces > b && Math.sign(S.bz) === k) own++; }
+    assert.equal(S.why, 'miss', `${srv} s=${s} vy=${vy} p=${p} r=${r} vx=${vx}: ${S.why}`); assert.equal(S.pw, srv); assert.equal(own, 1);
+    n++;
+  }
+  assert.ok(n > 400);
+});
+
+test('servis langsung ke meja lawan = servis tidak sah', () => {
+  const S = newState(); Object.assign(S, {ph: 'play', last: 'h', rally: 1, sv: true, sb: 0, bx: 0, by: 1.1, bz: .3, vx: 0, vy: 0, vz: -3, w: 0});
+  run(S); assert.equal(S.why, 'serve'); assert.equal(S.pw, 'g');
+});
+
+test('lemparan servis: dipukul saat turun; tidak terpukul = lempar ulang (berbantuan) atau poin hilang (realistis)', () => {
+  const nobody = {swing: () => ({s: 1, vy: 0}), remote: () => true};
+  const A = newState(); startRound(A, 7, 1); A.err = .6;
+  for (let i = 0; i < 400; i++) step(A, 1 / 120, nobody);
+  assert.equal(A.ph, 'serve'); assert.equal(A.sl + A.sr, 0);
+  const B = newState(); startRound(B, 7, 1); B.err = 1;
+  for (let i = 0; i < 400 && B.ph === 'serve'; i++) step(B, 1 / 120, nobody);
+  assert.equal(B.why, 'toss'); assert.equal(B.pw, 'g');
+  const C = newState(); startRound(C, 7, 1); let rising = false;
+  const hitter = {swing: () => ({s: 1.5, vy: 0}), onHit: () => { rising = C.vy > 0 && C.ph === 'serve'; }};
+  for (let i = 0; i < 400 && C.ph === 'serve'; i++) { Object.assign(C, {hx: C.bx, hy: C.by, hz: C.bz}); step(C, 1 / 120, hitter); }
+  assert.equal(C.ph, 'play'); assert.equal(C.sv, true); assert.equal(rising, false);
+});
+
+test('tanpa volley: bola belum memantul di meja sendiri tidak bisa dipukul', () => {
+  const S = newState(); Object.assign(S, {ph: 'play', bn: 0, bx: 0, by: 1, bz: 1.2, last: 'g', hx: 0, hy: 1, hz: 1.2});
+  assert.equal(tryHit(S, 'h', {swing: () => ({s: 1, vy: 0})}), false);
+  S.bn = 1; assert.equal(tryHit(S, 'h', {swing: () => ({s: 1, vy: 0})}), true);
 });

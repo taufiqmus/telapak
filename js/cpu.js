@@ -24,8 +24,8 @@ export class Cpu {
       this.off = [(Math.random() - .5) * .3 * p.err, (Math.random() - .5) * .2 * p.err];
     }
     if (S.ph === 'serve' && S.srv === 'g') {
-      if (S.t > .05) { this.feedX = null; return; }
-      // tepat sebelum servis: bat ke bola; mesin menggeser bat agar arah lemparannya bervariasi
+      if (!S.toss || S.vy > 0) { this.feedX = null; return; } // tunggu bola lemparan mulai turun
+      // bola lemparan turun: bat ke bola; mesin menggeser bat agar arah lemparannya bervariasi
       if (this.feedX === null) this.feedX = p.mv ? 0 : rnd(-.14, .14);
       S.gx = S.bx + this.feedX; S.gy = S.by; S.gz = S.bz; S.gr = 0; S.gp = 0;
       return;
