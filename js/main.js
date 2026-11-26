@@ -56,6 +56,7 @@ function menuHighlight() { // pemain baru diarahkan ke tutorial
 const lockButtons = v => { for (const id of ['host', 'join', 'cpu', 'tut', 'lat', 'kar', 'duo']) $(id).disabled = v; };
 
 function fail(text) { // kembali ke menu dengan pesan; tombol bisa dipakai lagi
+  setText('tip', '');
   if (conn) conn.close();
   closePeer();
   conn = null; role = null; cpu = null; karierIdx = null; tut = null; replay = null; myReady = oppReady = false; pend = null;
@@ -195,7 +196,7 @@ function guestSync() {
   for (const k in T) GB[k] = S.ph !== 'play' || far || k[0] === 'v' || k === 'w' ? T[k] : GB[k] + (T[k] - GB[k]) * .3;
 }
 function guestTick(dt, own) {
-  if (S.ph === 'play' && !S.paused) fly(GB, dt / S.ts);
+  if ((S.ph === 'play' || pend) && !S.paused) fly(GB, dt / S.ts); // servis yang sudah kita pukul ikut terbang sebelum host mengonfirmasi
   if (pend || S.paused) return;
   // tamu menilai pukulannya sendiri terhadap bola yang ia lihat, lalu memberi tahu host (pemukul diuntungkan)
   const T = {...S, ...GB, gx: own.x, gy: own.y, gz: own.z, gr: own.r, gp: own.p, near: {h: null, g: null}};
@@ -204,7 +205,7 @@ function guestTick(dt, own) {
   send(m, 3);
   for (const k in GB) GB[k] = T[k];
   pend = {hits: S.hits + 1, at: performance.now()};
-  onMyHit(T); fxHit(T, 'g'); fx.hits = S.hits + 1;
+  onMyHit(T, T.smashes > S.smashes); fxHit(T, 'g'); fx.hits = S.hits + 1;
 }
 // Host: terima pukulan tamu bila masuk akal. Poin yang baru saja berakhir karena tamu "gagal" boleh dibatalkan.
 function hostHit(d) {
@@ -274,8 +275,8 @@ cv.addEventListener('pointerdown', () => { if (replay) replay = null; });
 
 // ---------- umpan balik ----------
 const fx = {hits: 0, bounces: 0, smashes: 0, pts: 0, my: -1, op: -1};
-function onMyHit(T) { // statistik pukulan pemain laptop ini
-  const d = {pukulan: 1}; if (T.w > .4) d.topspin = 1; if (T.smashes > S.smashes) d.smash = 1;
+function onMyHit(T, smash) { // statistik pukulan pemain laptop ini
+  const d = {pukulan: 1}; if (T.w > .4) d.topspin = 1; if (smash) d.smash = 1;
   progress(d);
 }
 function fxHit(D, side) {
@@ -359,14 +360,15 @@ function hud() {
   setText('msg', msg);
 
   // suara, efek, dan statistik dipicu oleh penghitung di keadaan, jadi tamu ikut mendapatkannya
-  if (S.hits !== fx.hits) { if (S.hits > fx.hits) fxHit(S, S.last); fx.hits = S.hits; }
+  if (S.hits !== fx.hits && !(pend && S.hits < fx.hits)) { // tamu: pukulan prediksi sudah diberi efek, tunggu konfirmasi host
+    if (S.hits > fx.hits) fxHit(S, S.last); fx.hits = S.hits; }
   if (S.bounces !== fx.bounces) { fx.bounces = S.bounces; snd.sBounce(); }
   const pts = S.sl + S.sr;
   if (pts > fx.pts) {
     const win = S.pw === me;
     snd.sPoint(win || duo); if (S.rally >= 6) { snd.sCrowd(S.rally >= 12); view.cheer(1.5); }
     if (!duo) {
-      if (S.miss && S.miss.side === me) store.logShot({hit: 0, d: +S.miss.d.toFixed(3), dx: +S.miss.dx.toFixed(3), dy: +S.miss.dy.toFixed(3)});
+      if (S.miss && S.miss.side === me && S.miss.d <= 5) store.logShot({hit: 0, d: +S.miss.d.toFixed(3), dx: +S.miss.dx.toFixed(3), dy: +S.miss.dy.toFixed(3)});
       progress(lat ? (win ? {latihan: 1, reli: S.rally} : {reli: S.rally}) : {reli: S.rally});
     }
   }
@@ -430,11 +432,11 @@ function tick(now) {
     step(S, hitstop > 0 ? dt * .15 : dt, {
       swing: side => cpu && side === 'g' ? cpu.swing(S) : {...sp[side]},
       remote: side => role === 'host' && side === 'g',
-      onHit: (side, r) => {
-        if (side === ownSide() || duo) { if (!duo) { onMyHit(S); store.logShot({hit: 1, d: +r.d.toFixed(3), along: +r.along.toFixed(3)}); } if (side === 'h') tutHit(); }
+      onHit: (side, r, smash) => {
+        if (side === ownSide() || duo) { if (!duo) { onMyHit(S, smash); store.logShot({hit: 1, d: +r.d.toFixed(3), along: +r.along.toFixed(3)}); } if (side === 'h') tutHit(); }
       }
     });
-    if (S.hits !== hits) hitstop = reduced.matches ? 0 : S.smashes > fx.smashes ? .12 : .045;
+    if (S.hits !== hits) hitstop = reduced.matches || net() ? 0 : S.smashes > fx.smashes ? .12 : .045; // duel: tanpa hitstop, prediksi bola tamu tidak mengenalnya
     if (before === 'play') rec.push({D: snapBall(), bats: {h: batOf(S, 'h'), g: batOf(S, 'g')}, dt});
     while (rec.length > 200) rec.shift();
     if (before === 'play' && S.ph === 'point') {

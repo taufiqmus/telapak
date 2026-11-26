@@ -29,7 +29,7 @@ Saat bola lolos, layar memberi tahu sebabnya: bat terlalu kiri/kanan/tinggi/rend
 ES module tidak jalan dari `file://`, jadi buka lewat server lokal:
 
 ```sh
-npm run dev        # http://localhost:8080
+npm run dev        # http://127.0.0.1:8080
 npm test           # tes fisika, aturan skor, dan penyimpanan
 ```
 

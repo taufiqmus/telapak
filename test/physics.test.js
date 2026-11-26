@@ -101,3 +101,11 @@ test('ndcToHand: bat tepat di bawah kursor', async () => {
     assert.ok(Math.abs(b.x / fwd / (tan * aspect) - nx) < 1e-9 && Math.abs((d[1] * up[1] + d[2] * up[2]) / fwd / tan - ny) < 1e-9);
   }
 });
+
+test('sisi jarak jauh tidak dipukul lokal, tapi near-miss-nya tetap dicatat', () => {
+  const S = newState(); Object.assign(S, {ph: 'play', bx: 0, by: 1, bz: -1.5, last: 'h', gx: .4, gy: 1, gz: -1.5});
+  assert.equal(tryHit(S, 'g', {swing: () => ({s: 1, vy: 0}), remote: s => s === 'g'}), false);
+  assert.ok(S.near.g && S.near.g.d > 0);
+  S.gx = 0; assert.equal(tryHit(S, 'g', {swing: () => ({s: 1, vy: 0}), remote: s => s === 'g'}), false);
+  assert.equal(S.hits, 0);
+});

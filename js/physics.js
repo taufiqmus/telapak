@@ -84,13 +84,14 @@ export function canHit(S, side) {
 
 // opt.swing(side) -> {s: kecepatan ayun m/s, vy: kecepatan tegak bat m/s}; opt.remote(side) = true bila pukulan sisi itu dinilai di laptop lain
 export function tryHit(S, side, opt) {
-  if (!canHit(S, side) || (opt.remote && opt.remote(side))) return false;
+  if (!canHit(S, side)) return false;
   const r = reach(S, side);
   if (r.along < -.2 || r.along > .45) return false; // kedalaman dari satu kamera kasar, jadi toleransinya longgar
+  // near-miss dicatat juga untuk sisi jarak jauh, supaya petunjuk meleset tamu tetap benar
   if (S.ph === 'play') { const n = S.near[side]; if (!n || r.d < n.d) S.near[side] = {d: r.d, dx: r.dx, dy: r.dy}; }
-  if (r.d > HIT) return false;
-  applyHit(S, side, batOf(S, side), opt.swing(side));
-  if (opt.onHit) opt.onHit(side, r);
+  if (r.d > HIT || (opt.remote && opt.remote(side))) return false;
+  const smash = applyHit(S, side, batOf(S, side), opt.swing(side));
+  if (opt.onHit) opt.onHit(side, r, smash);
   return true;
 }
 
