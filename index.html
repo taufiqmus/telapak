@@ -8,6 +8,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=Barlow:wght@400;600&display=swap">
 <style>
@@ -176,6 +177,7 @@
         <label class="c"><span>Pitch bat (eksperimental)<small>Condongkan jari untuk menutup atau membuka bilah.</small></span><input type="checkbox" id="pitch"></label>
       </fieldset>
       <fieldset><legend>Tampilan dan suara</legend>
+        <div class="opsi"><span class="lbl" id="gfxL">Grafis</span><select id="gfx" class="seg" aria-labelledby="gfxL"><option value="rendah">Rendah</option><option value="sedang" selected>Sedang</option><option value="tinggi">Tinggi</option><option value="ultra" data-short="Ultra">Ultra: sangat realistis</option></select><p class="ket" id="gfxK"></p></div>
         <label class="c"><span>Tayangan ulang<small>Reli panjang dan smash diputar ulang pelan.</small></span><input type="checkbox" id="replay" checked></label>
         <label class="c"><span>Suara</span><input type="checkbox" id="sound" checked></label>
       </fieldset>

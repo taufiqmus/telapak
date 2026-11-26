@@ -642,6 +642,12 @@ function drawPip() {
 window.telapakLog = () => { const L = store.readLog(); console.table(L.slice(-20)); return JSON.stringify(L); };
 if (new URLSearchParams(location.search).has('debug')) window.__telapak = {get S() { return S; }, get replay() { return replay; }, prog}; // untuk uji otomatis
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { /* tanpa offline pun game tetap jalan */ });
+// tingkat grafis: berlaku langsung, tersimpan di laptop ini
+const GFX = {rendah: 'Paling ringan: tanpa bayangan, resolusi rendah. Pilih ini bila FPS pose turun.', sedang: 'Tampilan standar, ringan untuk kebanyakan laptop.',
+  tinggi: 'Bayangan lembut, pencahayaan aula, tekstur lantai dan meja, penonton berbentuk orang.', ultra: 'Sangat realistis: ditambah ambient occlusion, bloom, dan resolusi penuh. Butuh GPU kuat; bisa menurunkan FPS pose.'};
+$('gfx').value = GFX[localStorage.getItem('telapak-gfx')] ? localStorage.getItem('telapak-gfx') : 'sedang';
+const applyGfx = () => { view.setQuality($('gfx').value); setText('gfxK', GFX[$('gfx').value]); localStorage.setItem('telapak-gfx', $('gfx').value); };
+$('gfx').addEventListener('change', applyGfx); applyGfx();
 document.querySelectorAll('select.seg').forEach(segmen);
 menuHighlight(); ringkas();
 requestAnimationFrame(tick);
