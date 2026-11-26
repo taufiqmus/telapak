@@ -203,14 +203,16 @@ export function createScene(cv) {
     renderer.toneMappingExposure = 1.05;
     hemi.intensity = cfg.real ? .45 : 1.1; sun.intensity = sun2.intensity = cfg.real ? .55 : 1.4; key.intensity = cfg.real ? 2.8 : 0;
     blocks.visible = !cfg.real; people.visible = cfg.real;
-    if (cfg.real && !envTex) {
-      const {RoomEnvironment} = await import('three/addons/environments/RoomEnvironment.js');
-      const pm = new THREE.PMREMGenerator(renderer); envTex = pm.fromScene(new RoomEnvironment(), .04).texture; pm.dispose();
-    }
+    try { // modul tambahan dari CDN; gagal (mis. luring) = tampil tanpa peta lingkungan atau pasca-proses, bisa dicoba lagi
+      if (cfg.real && !envTex) {
+        const {RoomEnvironment} = await import('three/addons/environments/RoomEnvironment.js');
+        const pm = new THREE.PMREMGenerator(renderer); envTex = pm.fromScene(new RoomEnvironment(), .04).texture; pm.dispose();
+      }
+    } catch (e) { console.warn('Peta lingkungan gagal dimuat', e); quality = ''; }
     scene.environment = cfg.real ? envTex : null;
     scene.traverse(o => { if (o.material) for (const m of [].concat(o.material)) { m.envMapIntensity = .45; m.needsUpdate = true; } });
     // pasca-proses (ultra): MSAA + ambient occlusion + bloom halus, hanya untuk satu tampilan penuh
-    if (cfg.post && !composer) {
+    if (cfg.post && !composer) try {
       const [{EffectComposer}, {RenderPass}, {GTAOPass}, {UnrealBloomPass}, {OutputPass}] = await Promise.all([
         import('three/addons/postprocessing/EffectComposer.js'), import('three/addons/postprocessing/RenderPass.js'), import('three/addons/postprocessing/GTAOPass.js'),
         import('three/addons/postprocessing/UnrealBloomPass.js'), import('three/addons/postprocessing/OutputPass.js')]);
@@ -222,7 +224,7 @@ export function createScene(cv) {
       composer.addPass(gtao);
       composer.addPass(new UnrealBloomPass(new THREE.Vector2(sz.x, sz.y), .28, .5, .92));
       composer.addPass(new OutputPass());
-    }
+    } catch (e) { console.warn('Pasca-proses gagal dimuat', e); composer = null; quality = ''; }
     resized = false;
   }
   let resized = false;
@@ -291,7 +293,7 @@ export function createScene(cv) {
         setArm(fpArm[k], new THREE.Vector3(ex + s * (F.hands[k] === 'R' ? .3 : -.3), 1.15 + e.y, s * (EYE_Z - .05)), grip(b));
       }
 
-      const post = composer && F.views.length === 1;
+      const post = cfg.post && composer && F.views.length === 1; // pasca-proses hanya di Ultra
       renderer.setScissorTest(!post);
       for (const v of F.views) {
         const x = v.x * W, y = v.y * H, w = v.w * W, h = v.h * H;
