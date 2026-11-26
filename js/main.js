@@ -413,7 +413,7 @@ function hud() {
     else if (S.paused) msg = 'Jeda';
     else if (conn && performance.now() - rxT > 2000) msg = 'Menunggu lawan…';
     else if (S.ph === 'wait') msg = 'Menunggu lawan siap…';
-    else if (S.ph === 'serve') msg = lat ? '' : duo ? (S.srv === 'h' ? 'Servis: pemain kiri' : 'Servis: pemain kanan') : S.srv === me ? (S.toss || gToss ? 'Servis: pukul saat bola turun' : S.hold ? (S.t > 0 ? 'Servis: pegang bola di tangan bebas, depan dada' : S.t > -2.5 ? 'Servis: lempar bola ke atas dengan tangan bebas' : 'Servis: angkat tangan bebas lebih cepat') : 'Servis: bola akan dilempar') : 'Lawan servis';
+    else if (S.ph === 'serve') msg = lat ? '' : duo ? (S.srv === 'h' ? 'Servis: pemain kiri' : 'Servis: pemain kanan') : S.srv === me ? (S.arcade ? 'Servis: pukul bola' : S.toss || gToss ? 'Servis: pukul saat bola turun' : S.hold ? (S.t > 0 ? 'Servis: pegang bola di tangan bebas, depan dada' : S.t > -2.5 ? 'Servis: lempar bola ke atas dengan tangan bebas' : 'Servis: angkat tangan bebas lebih cepat') : 'Servis: bola akan dilempar') : 'Lawan servis';
     else if (S.ph === 'point' && S.why === 'let') msg = 'Let: servis menyentuh net, diulang';
     else if (S.ph === 'point') {
       const why = S.why === 'miss' ? (S.miss && S.miss.side === me && !duo ? missText(S.miss) : '') : WHY[S.why] + (S.last === me && !duo && CAUSE[S.cause] && ['net', 'out', 'wide', 'own'].includes(S.why) ? ', ' + CAUSE[S.cause] : '');
@@ -470,7 +470,7 @@ function showResult() {
 // Hanya untuk satu pemain kamera yang sedang servis. Mouse, berdua satu kamera, atau tangan bebas tidak terlihat 2,5 s: lemparan otomatis.
 const tossBuf = [], held = {start: 0, seen: 0};
 function handServe(side, aspect, eye, now) {
-  if (mouseCtl() || role === 'duo' || !poseStat.ready || S.ph !== 'serve' || S.srv !== side || S.toss) { tossBuf.length = 0; held.start = 0; return null; }
+  if (S.arcade || mouseCtl() || role === 'duo' || !poseStat.ready || S.ph !== 'serve' || S.srv !== side || S.toss) { tossBuf.length = 0; held.start = 0; return null; }
   if (!held.start) held.start = held.seen = now;
   const f = trackers[0].free, fresh = f && now - f.t < 150;
   if (fresh) held.seen = now;
@@ -512,7 +512,7 @@ function tick(now) {
   if (conn && now - rxT > 30000) fail('Lawan tidak merespons. Buat room baru atau gabung lagi.');
   const local = role === 'cpu' || role === 'duo' || (role === 'host' && conn);
   if (local && !S.paused && !stale && !calMsg && !replay) {
-    S.err = tut ? 0 : +$('assist').value; S.errG = S.mode === 'latihan' ? 0 : S.err; // mesin latihan selalu rapi; komputer kena galat kontak yang sama dengan pemain
+    const as = +$('assist').value; S.arcade = !tut && as < 0; S.err = tut ? 0 : Math.max(0, as); // -1 = arkade S.errG = S.mode === 'latihan' ? 0 : S.err; // mesin latihan selalu rapi; komputer kena galat kontak yang sama dengan pemain
     for (const side in own) { setBat(side, own[side]); S[side + 'ex'] = eye[side].x; S[side + 'ey'] = eye[side].y; }
     if (duo) { S.hh = trackers[0].hand; S.gh = trackers[1].hand; } else S.hh = myHand(); // komputer: tangan kanan dari newState
     if (!duo) { // servis pemain laptop ini: bola di tangan bebas sampai dilempar

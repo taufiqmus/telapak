@@ -60,7 +60,7 @@ export class Cpu {
     const p = this.p, r = this.rng;
     this.t += dt;
     if (S.ph === 'serve' && S.srv === 'g') {
-      if (!S.toss || S.vy > 0) { this.feedX = null; return; } // tunggu bola lemparan mulai turun
+      if (S.arcade ? S.t > .05 : !S.toss || S.vy > 0) { this.feedX = null; return; } // tunggu bola lemparan mulai turun (arkade: tunggu giliran)
       // bola lemparan turun: bat ke bola; mesin menggeser bat agar arah lemparannya bervariasi
       if (this.feedX === null) this.feedX = p.mv ? 0 : (r() - .5) * .28;
       S.gx = S.bx + this.feedX; S.gy = S.by; S.gz = S.bz; S.gr = p.mv ? this.aimR(S, S.gx) : 0; S.gp = 0;

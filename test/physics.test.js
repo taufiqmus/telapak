@@ -331,3 +331,14 @@ test('bola yang ditahan tetap dilempar otomatis setelah 5 detik (gerak lempar ta
   for (let i = 0; i < 120 * 8 && !S.toss; i++) step(S, 1 / 120, {swing: () => ({s: 1, vy: 0})}); // jeda awal 1,5 s + tunggu 5 s
   assert.equal(S.toss, true);
 });
+
+test('arkade: servis bola diam langsung ke meja lawan, boleh volley, bola selalu masuk', () => {
+  const S = newState(); startRound(S, 7, 1); Object.assign(S, {arcade: true, err: 0});
+  const hit = {swing: () => ({s: 1.5, vy: 0})};
+  for (let i = 0; i < 400 && S.ph === 'serve'; i++) { Object.assign(S, {hx: S.bx, hy: S.by, hz: S.bz}); step(S, 1 / 120, hit); }
+  assert.equal(S.ph, 'play'); assert.equal(S.sv, false); assert.equal(S.toss, false);
+  let ownBounce = 0; for (let i = 0; i < 3000 && S.ph === 'play'; i++) { const b = S.bounces; step(S, 1 / 240, blocked); if (S.bounces > b && S.bz > 0) ownBounce++; }
+  assert.equal(S.why, 'miss'); assert.equal(S.pw, 'h'); assert.equal(ownBounce, 0);
+  const V = newState(); Object.assign(V, {arcade: true, ph: 'play', bn: 0, bx: 0, by: 1, bz: 1.2, last: 'g', hx: 0, hy: 1, hz: 1.2});
+  assert.equal(tryHit(V, 'h', {swing: () => ({s: 1, vy: 0})}), true);
+});

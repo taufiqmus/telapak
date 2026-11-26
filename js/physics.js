@@ -22,7 +22,7 @@ export function newState() {
     win: 7, ts: 1, mode: 'match', paused: false, hits: 0, bounces: 0, smashes: 0, rally: 0, best: 0, dur: 0,
     nh: '', ng: '', hh: 'R', gh: 'R', hex: 0, hey: 0, gex: 0, gey: 0,
     tx: 0, tz: 0, near: {h: null, g: null},
-    err: 0, errG: 0, cause: '', ws: 0, cord: false, toss: false, hold: false, lowToss: false, sv: false, sb: 0, cords: 0, edges: 0, lets: 0, shot: '' // err: 0 = pukulan berbantuan penuh, 1 = realistis
+    err: 0, errG: 0, arcade: false, cause: '', ws: 0, cord: false, toss: false, hold: false, lowToss: false, sv: false, sb: 0, cords: 0, edges: 0, lets: 0, shot: '' // err: 0 = pukulan berbantuan penuh, 1 = realistis; arcade: aturan versi awal
   };
 }
 
@@ -143,7 +143,7 @@ export function launch(S, side, bat, swing, q) {
   const xt = clamp(aim, -.62 - .3 * e, .62 + .3 * e);
   const g = grav(w), ax = SIDE_G * ws;
   let t = shot === 'smash' ? .28 : shot === 'lob' ? 1.15 : shot === 'drop' ? .7 : (S.ph === 'serve' ? .42 : .6 - .25 * s) * (1 - .3 * pn), vx, vy, vz; // servis: lintasan rendah
-  const z2 = dir * clamp(.5 + .65 * s - .15 * pn, .4, 1.2), sv = S.ph === 'serve' && (serveSolve(S, side, w, ws, xt, z2) || serveSolve(S, side, w, ws, xt * .4, z2) || serveSolve(S, side, w, 0, 0, z2)); // sudut tak terjangkau: geser ke tengah, lalu buang sidespin
+  const z2 = dir * clamp(.5 + .65 * s - .15 * pn, .4, 1.2), sv = S.ph === 'serve' && !S.arcade && (serveSolve(S, side, w, ws, xt, z2) || serveSolve(S, side, w, ws, xt * .4, z2) || serveSolve(S, side, w, 0, 0, z2)); // sudut tak terjangkau: geser ke tengah, lalu buang sidespin
   if (sv) ({vx, vy, vz} = sv);
   else for (; t <= 2.6; t += .05) {
     vx = (xt - S.bx - .5 * ax * t * t) / t; vz = (zt - S.bz) / t; vy = (TY + BR - S.by + .5 * g * t * t) / t;
@@ -177,7 +177,7 @@ export function launch(S, side, bat, swing, q) {
 
 // Pukulan diterima: dipakai oleh tryHit lokal dan oleh host saat menerima pukulan tamu.
 export function applyHit(S, side, bat, swing, q) {
-  S.sv = S.ph === 'serve'; S.sb = 0; // servis: pantulan pertama harus di meja sendiri
+  S.sv = S.ph === 'serve' && !S.arcade; S.sb = 0; // servis: pantulan pertama harus di meja sendiri (arkade: langsung ke meja lawan)
   const smash = launch(S, side, bat, swing, q);
   S.cord = false; S.last = side; S.bn = 0; S.ph = 'play'; S.hits++; S.rally++; S.best = Math.max(S.best, S.rally);
   if (smash) S.smashes++;
@@ -197,10 +197,10 @@ export function reach(S, side) {
 
 export function canHit(S, side) {
   if (S.last === side) return false;
-  if (S.ph === 'serve') return S.srv === side && S.toss && S.vy < 0; // servis dipukul saat bola lemparan turun
+  if (S.ph === 'serve') return S.srv === side && (S.arcade ? S.t <= 0 : S.toss && S.vy < 0); // servis dipukul saat bola lemparan turun (arkade: bola diam)
   if (S.ph !== 'play') return false;
   if (S.mode === 'latihan' && side === 'g') return false; // mesin bola hanya melempar
-  return S.bn >= 1 && (side === 'h' ? S.bz >= .4 : S.bz <= -.4); // bola harus sudah memantul di meja sendiri (tanpa volley)
+  return (S.bn >= 1 || S.arcade) && (side === 'h' ? S.bz >= .4 : S.bz <= -.4); // bola harus sudah memantul di meja sendiri (tanpa volley; arkade boleh)
 }
 
 // opt.swing(side) -> {s: kecepatan ayun m/s, vy: kecepatan tegak bat m/s}; opt.remote(side) = true bila pukulan sisi itu dinilai di laptop lain
@@ -281,6 +281,7 @@ export function step(S, dt, opt) {
   if (S.ph !== 'over') S.dur += dt;
   if (S.ph === 'serve') {
     S.t -= dt;
+    if (S.arcade) { if (S.t <= 0) tryHit(S, S.srv, opt); return; } // arkade: bola diam, dipukul begitu bat menyentuhnya
     if (!S.toss) { if (S.t <= 0 && (!S.hold || S.t < -5)) toss(S, TOSS_V); return; } // jeda dulu, lalu dilempar; tangan pemain ditunggu paling lama 5 s
     const h = dt / S.ts, vy0 = S.vy; S.vy -= G * h; S.by += S.vy * h;
     if (S.lowToss && vy0 >= 0 && S.vy < 0) return endPoint(S, S.srv, 'lowtoss'); // lemparan tangan terlalu rendah (realistis)
