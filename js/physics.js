@@ -4,7 +4,7 @@ export const TL = 2.74, TW = 1.525, TY = .76, NET_TOP = TY + .1525, BR = .05, G 
 export const EYE_Y = 1.55, EYE_Z = 2.6, LOOK_Y = .85, LOOK_Z = -.3, FOV = 65; // kamera pemain, diam; dipakai juga oleh pemetaan tangan
 export const SPIN_G = 5; // percepatan tegak tambahan per satuan spin: topspin (+1) menukik, backspin (-1) melayang
 export const SMASH_SPEED = 3.2; // m/s ayunan bat; di atas ini bola tinggi dipukul smash
-export const PROTO = 3; // versi protokol duel; naikkan bila isi paket berubah
+export const PROTO = 4; // versi protokol duel; naikkan bila isi paket berubah
 
 export const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 export const lerp = (a, b, t) => a + (b - a) * t;
@@ -17,7 +17,7 @@ export function newState() {
     bx: 0, by: 1.1, bz: 1.1, vx: 0, vy: 0, vz: 0, w: 0,
     sl: 0, sr: 0, ph: 'wait', t: 0, srv: 'h', last: null, bn: 0, pw: 'h', why: '', miss: null,
     win: 7, ts: 1, mode: 'match', paused: false, hits: 0, bounces: 0, smashes: 0, rally: 0, best: 0, dur: 0,
-    nh: '', ng: '', hh: 'R', gh: 'R', tx: 0, tz: 0, near: {h: null, g: null}
+    nh: '', ng: '', hh: 'R', gh: 'R', hex: 0, hey: 0, gex: 0, gey: 0, tx: 0, tz: 0, near: {h: null, g: null}
   };
 }
 
@@ -82,8 +82,9 @@ export function applyHit(S, side, bat, swing) {
 export function reach(S, side) {
   const b = batOf(S, side), s = side === 'h' ? 1 : -1;
   const along = (S.bz - b.z) * s; // > 0: bola sudah melewati bat ke arah pemain
+  const ex = s * (side === 'h' ? S.hex : S.gex), ey = EYE_Y + (side === 'h' ? S.hey : S.gey); // mata ikut kepala pemain
   const k = (S.bz - s * EYE_Z) / (b.z - s * EYE_Z);
-  const dx = S.bx - b.x * k, dy = S.by - EYE_Y - (b.y - EYE_Y) * k;
+  const dx = S.bx - ex - (b.x - ex) * k, dy = S.by - ey - (b.y - ey) * k;
   return {along, d: Math.hypot(dx, dy), dx: dx * s, dy}; // dx dalam arah layar pemain itu: + = bola di kanan bat
 }
 

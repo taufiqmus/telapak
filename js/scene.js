@@ -115,7 +115,7 @@ export function createScene(cv) {
     kick(a) { shake = Math.max(shake, a); },
     cheer(a) { cheer = Math.max(cheer, a); },
     clearTrail() { hist.length = 0; },
-    // F: {D: bola dan fase, bats: {h, g}, views: [{side: 'h'|'g'|'tv', x, y, w, h}], hands: {h, g}, inGame, dt}
+    // F: {D: bola dan fase, bats: {h, g}, views: [{side: 'h'|'g'|'tv', x, y, w, h}], hands: {h, g}, eyes: {h, g}: geseran kepala {x, y} m, inGame, dt}
     draw(F) {
       const {D, dt} = F, W = cv.clientWidth, H = cv.clientHeight, sz = renderer.getSize(new THREE.Vector2());
       if (sz.x !== W || sz.y !== H) renderer.setSize(W, H, false);
@@ -150,12 +150,13 @@ export function createScene(cv) {
       shake *= Math.exp(-14 * dt);
 
       for (const k of ['h', 'g']) {
-        const s = k === 'h' ? 1 : -1, b = F.bats[k], c = chars[k], ow = new THREE.Vector3(b.x * .3, 0, s * (TL / 2 + 1));
+        const s = k === 'h' ? 1 : -1, b = F.bats[k], c = chars[k], e = F.eyes[k], ex = s * e.x;
+        const ow = new THREE.Vector3(ex + (b.x - ex) * .3, Math.min(0, e.y), s * (TL / 2 + 1)); // badan ikut kepala: condong dan jongkok
         c.g.position.copy(ow);
         const hs = F.hands[k] === 'L' ? -1 : 1; // lengan pemukul dari bahu tangan pemukul; backhand = lengan menyilang badan
         c.idle.position.x = hs * .25;
-        setArm(c.arm, new THREE.Vector3(ow.x + s * hs * .26, 1.3, ow.z), grip(b));
-        setArm(fpArm[k], new THREE.Vector3(s * (F.hands[k] === 'R' ? .3 : -.3), 1.15, s * (EYE_Z - .05)), grip(b));
+        setArm(c.arm, new THREE.Vector3(ow.x + s * hs * .26, 1.3 + ow.y, ow.z), grip(b));
+        setArm(fpArm[k], new THREE.Vector3(ex + s * (F.hands[k] === 'R' ? .3 : -.3), 1.15 + e.y, s * (EYE_Z - .05)), grip(b));
       }
 
       renderer.setScissorTest(true);
@@ -166,8 +167,9 @@ export function createScene(cv) {
         const tv = v.side === 'tv', s = v.side === 'h' ? 1 : -1;
         if (tv) { cam.position.set(3.3, 2.1, .6); cam.lookAt(0, .85, 0); }
         else {
-          cam.position.set((Math.random() - .5) * shake, EYE_Y + (Math.random() - .5) * shake, s * EYE_Z); // kamera orang pertama, diam kecuali getar smash
-          cam.lookAt(0, LOOK_Y, s * LOOK_Z);
+          const e = F.eyes[v.side], ex = s * e.x; // kamera orang pertama ikut kepala pemain (digeser, tidak diputar: pemetaan tangan tetap berlaku)
+          cam.position.set(ex + (Math.random() - .5) * shake, EYE_Y + e.y + (Math.random() - .5) * shake, s * EYE_Z);
+          cam.lookAt(ex, LOOK_Y + e.y, s * LOOK_Z);
         }
         for (const k of ['h', 'g']) {
           const mine = !tv && k === v.side;

@@ -32,6 +32,19 @@ export class Tracker {
     this.fil = {x: 0, y: .5, z: .5, r: 0, p: 0}; // keluaran filter; x:-1..1 (kanan layar), y:0..1 (atas), z:0..1 (maju ke net), r:-1..1 (miring)
     this.hand = 'R'; this.pick = false; this.palm = null; this.lastSeen = 0;
     this.zBase = 0; this.rBase = 0; this.pBase = 0; this.rawP = 0; this.calBuf = null;
+    this.hf = {x: new OneEuro(2), y: new OneEuro(2)}; this.hBase = null; this.headRaw = null;
+    this.head = {x: 0, y: 0}; // geseran kepala dari posisi kalibrasi, meter: x ke kanan pemain, y ke atas
+  }
+  // Kepala: rata-rata hidung, mata, telinga. Lebar bahu (~0,38 m) jadi penggaris, jadi tidak bergantung jarak ke kamera.
+  // Hanya geser kiri-kanan dan naik-turun: maju-mundur dari ukuran badan tertipu oleh badan yang berputar saat backhand.
+  readHead(lm, now) {
+    const ids = [0, 2, 5, 7, 8], sw = Math.abs(lm[11].x - lm[12].x);
+    if (sw < .05 || lm[0].visibility < .5) { this.headRaw = null; return; }
+    const c = {x: ids.reduce((t, i) => t + lm[i].x, 0) / 5, y: ids.reduce((t, i) => t + lm[i].y, 0) / 5, sw};
+    this.headRaw = c;
+    if (!this.hBase) return;
+    const k = .38 / this.hBase.sw;
+    this.head = {x: this.hf.x.f(clamp((this.hBase.x - c.x) * k, -.45, .45), now, .8), y: this.hf.y.f(clamp((this.hBase.y - c.y) * .75 * k, -.35, .25), now, .8)};
   }
   med3(k, v) { const h = this.hist[k]; h.push(v); if (h.length > 3) h.shift(); return h.length < 3 ? v : [...h].sort((a, b) => a - b)[1]; }
   lost(now) { if (now - this.lastSeen > 200) this.palm = null; } // tahan 200 ms saat deteksi putus
@@ -42,12 +55,15 @@ export class Tracker {
     if (!B || !B.length) return;
     const med = k => B.map(b => b[k]).sort((a, b) => a - b)[B.length >> 1];
     this.zBase = med('z'); this.pBase = med('p');
+    const H = B.filter(b => b.hx !== undefined), hm = k => H.map(b => b[k]).sort((a, b) => a - b)[H.length >> 1];
+    if (H.length) { this.hBase = {x: hm('hx'), y: hm('hy'), sw: hm('sw')}; this.hf.x.x = this.hf.y.x = null; this.head = {x: 0, y: 0}; }
     this.rBase = Math.atan2(B.reduce((t, b) => t + Math.sin(b.r), 0), B.reduce((t, b) => t + Math.cos(b.r), 0));
     for (const k in this.hist) { this.hist[k].length = 0; this.filt[k].x = null; this.filt[k].dx = 0; } // mulai bersih dari netral baru
   }
   // o: {hand: 'auto'|'L'|'R', smooth: 0..1, pitch: bool, a, b: rentang x layar (dicerminkan) yang dipetakan ke lebar penuh}
   update(lm, wl, now, o) {
     if (!lm || !wl) return this.lost(now);
+    this.readHead(lm, now);
     const vis = ids => ids.reduce((t, i) => t + lm[i].visibility, 0) / ids.length;
     if (o.hand !== 'auto') this.hand = o.hand;
     else if (this.pick && Math.abs(lm[15].y - lm[16].y) > .05) this.hand = lm[15].y < lm[16].y ? 'L' : 'R'; // hanya saat kalibrasi: tangan yang lebih tinggi
@@ -60,14 +76,17 @@ export class Tracker {
     const c = {x: pts.reduce((t, p) => t + p.x, 0) / 4, y: pts.reduce((t, p) => t + p.y, 0) / 4};
     this.palm = {pts, c};
     const zRaw = ids.reduce((t, i) => t + wl[i].z, 0) / 4 - (wl[11].z + wl[12].z) / 2; // meter, relatif bahu (pinggul sering di luar gambar); makin negatif = makin dekat kamera
-    const sx = 1 - c.x; // layar dicerminkan
+    // o.head: bat ikut geseran kepala (dibuang di sini, ditambahkan lagi di dunia), jadi tangan dibaca relatif terhadap badan
+    const hs = o.head && this.hBase ? .38 / this.hBase.sw : 0;
+    const sx = 1 - c.x - (hs ? this.head.x / hs : 0); // layar dicerminkan
+    const sy = c.y + (hs ? this.head.y / (.75 * hs) : 0);
     const mid = {x: (pts[2].x + pts[1].x) / 2, y: (pts[2].y + pts[1].y) / 2}; // tengah telunjuk-kelingking
     const rawR = Math.atan2(-(mid.x - pts[0].x), -(mid.y - pts[0].y) * .75); // .75 = 480/640 karena x dan y dinormalkan per sisi; 0 = jari menunjuk ke atas
     // pitch dari telapak sendiri, bukan lengan bawah: menjangkau ke depan tidak lagi terbaca sebagai bilah menutup, dan siku boleh di luar gambar
     this.rawP = palmPitch(wl[ids[0]], wl[ids[2]], wl[ids[1]]);
-    if (this.calBuf) this.calBuf.push({z: zRaw, r: rawR, p: this.rawP});
+    if (this.calBuf) this.calBuf.push({z: zRaw, r: rawR, p: this.rawP, ...(this.headRaw ? {hx: this.headRaw.x, hy: this.headRaw.y, sw: this.headRaw.sw} : {})});
     const mc = 3 * Math.pow(.1, o.smooth); // 0 -> 3 Hz (responsif), 1 -> 0.3 Hz (halus)
-    const raw = {x: clamp((sx - o.a) / (o.b - o.a)) * 2 - 1, y: 1 - clamp((c.y - .15) / .7), z: clamp(.5 + (this.zBase - zRaw) * 1.7), // 1,7 / m: jangkauan lengan sekitar +-0,3 m
+    const raw = {x: clamp((sx - o.a) / (o.b - o.a)) * 2 - 1, y: 1 - clamp((sy - .15) / .7), z: clamp(.5 + (this.zBase - zRaw) * 1.7), // 1,7 / m: jangkauan lengan sekitar +-0,3 m
       r: clamp(dz(wrap(rawR - this.rBase), .06), -1, 1), p: !o.pitch ? 0 : clamp(dz(this.rawP - this.pBase, .06) * .8, -.6, .6)}; // bat: roll dan pitch relatif terhadap netral
     for (const k in raw) this.fil[k] = this.filt[k].f(k in this.hist ? this.med3(k, raw[k]) : raw[k], now, mc * MINCUT_SCALE[k]);
   }

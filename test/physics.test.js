@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {newState, nextServe, startRound, step, applyHit, tryHit, won, fly, backhand, palmPitch, launch, TY, BR, HIT} from '../js/physics.js';
+import {newState, nextServe, startRound, step, applyHit, tryHit, won, fly, backhand, palmPitch, launch, reach, TY, BR, HIT} from '../js/physics.js';
 
 const blocked = {swing: () => ({s: 1, vy: 0}), remote: () => true}; // tidak ada yang bisa memukul
 const run = (S, opt = blocked, max = 2000) => { for (let i = 0; i < max && S.ph === 'play'; i++) step(S, 1 / 120, opt); };
@@ -135,4 +135,15 @@ test('palmPitch: condong jari ke kamera, tidak terpengaruh roll dan sisi telapak
 test('bilah menutup menambah topspin, membuka menambah backspin', () => {
   const spin = p => { const S = newState(); Object.assign(S, {ph: 'play', bx: 0, by: 1, bz: 1}); launch(S, 'h', {x: 0, y: 1, z: 1, r: 0, p}, {s: 1.5, vy: 0}); return S.w; };
   assert.ok(spin(.6) > .3); assert.equal(spin(0), 0); assert.ok(spin(-.6) < -.3);
+});
+
+test('reach: kepala dan bat bergeser bersama = penilaian kena tidak berubah', () => {
+  const base = newState(); Object.assign(base, {bx: .1, by: 1.05, bz: 1.2, hx: 0, hy: 1, hz: 1.3});
+  const r0 = reach(base, 'h');
+  for (const [ox, oy] of [[.3, 0], [-.25, .15], [0, -.2]]) {
+    const S = {...base, bx: base.bx + ox, by: base.by + oy, hx: ox, hy: 1 + oy, hex: ox, hey: oy};
+    const r = reach(S, 'h'); assert.ok(Math.abs(r.d - r0.d) < 1e-9 && Math.abs(r.dx - r0.dx) < 1e-9);
+    const G = {...base, bx: -base.bx - ox, by: base.by + oy, bz: -base.bz, gx: -ox, gy: 1 + oy, gz: -base.hz, gex: ox, gey: oy}; // tamu: kanannya di -x
+    assert.ok(Math.abs(reach(G, 'g').d - r0.d) < 1e-9);
+  }
 });

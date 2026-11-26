@@ -35,6 +35,8 @@ let tut = null;
 
 const ownSide = () => role === 'guest' ? 'g' : 'h';
 const net = () => role === 'host' || role === 'guest';
+const ZERO = {x: 0, y: 0};
+const headOn = () => $('headpov').checked && poseStat.ready && !mouseCtl(); // sudut pandang ikut kepala
 const myHand = () => mouseCtl() ? ($('hand').value === 'L' ? 'L' : 'R') : trackers[0].hand; // tangan pemukul pemain laptop ini
 const mouseCtl = () => $('ctrl').value === 'mouse' && role !== 'duo';
 const status = t => $('st').textContent = t;
@@ -146,6 +148,7 @@ function bindConn(c) {
     if (d.t === 'p' && role === 'host') {
       if (d.n <= rxN) return; rxN = d.n; // paket bisa datang tidak berurutan
       S.gx = clamp(d.x, -2, 2); S.gy = clamp(d.y, .2, 2); S.gz = clamp(d.z, -1.9, -1); S.gr = clamp(d.r, -1.3, 1.3); S.gp = clamp(d.p, -1.2, 1.2); S.gh = d.h === 'L' ? 'L' : 'R';
+      S.gex = clamp(+d.ex || 0, -.45, .45); S.gey = clamp(+d.ey || 0, -.35, .25);
     } else if (d.t === 's' && role === 'guest') {
       if (d.n > rxN) { rxN = d.n; Object.assign(S, d.s); guestSync(); }
     } else if (d.t === 'hit' && role === 'host') hostHit(d);
@@ -196,11 +199,11 @@ function guestSync() {
   const far = Math.hypot(GB.bx - T.bx, GB.by - T.by, GB.bz - T.bz) > .4;
   for (const k in T) GB[k] = S.ph !== 'play' || far || k[0] === 'v' || k === 'w' ? T[k] : GB[k] + (T[k] - GB[k]) * .3;
 }
-function guestTick(dt, own) {
+function guestTick(dt, own, eye) {
   if ((S.ph === 'play' || pend) && !S.paused) fly(GB, dt / S.ts); // servis yang sudah kita pukul ikut terbang sebelum host mengonfirmasi
   if (pend || S.paused) return;
   // tamu menilai pukulannya sendiri terhadap bola yang ia lihat, lalu memberi tahu host (pemukul diuntungkan)
-  const T = {...S, ...GB, gx: own.x, gy: own.y, gz: own.z, gr: own.r, gp: own.p, near: {h: null, g: null}};
+  const T = {...S, ...GB, gx: own.x, gy: own.y, gz: own.z, gr: own.r, gp: own.p, gex: eye.x, gey: eye.y, near: {h: null, g: null}};
   if (!tryHit(T, 'g', {swing: () => ({...sp.g})})) return;
   const m = {t: 'hit', id: ++hitId, bx: GB.bx, by: GB.by, bz: GB.bz, bat: own, sw: {...sp.g}};
   send(m, 3);
@@ -395,7 +398,8 @@ function showResult() {
 }
 
 // ---------- loop ----------
-const toWorld = (side, m, aspect) => { const s = side === 'h' ? 1 : -1, b = handToBat(m.x, m.y, m.z, aspect); return {x: s * b.x, y: b.y, z: s * b.z, r: s * m.r, p: s * m.p}; };
+// e: geseran kepala pemain. Bat ikut bergeser bersama mata, jadi yang terlihat menutupi bola tetap dinilai kena.
+const toWorld = (side, m, aspect, e) => { const s = side === 'h' ? 1 : -1, b = handToBat(m.x, m.y, m.z, aspect); return {x: s * (b.x + e.x), y: b.y + e.y, z: s * b.z, r: s * m.r, p: s * m.p}; };
 function measureSwing(dt) { // kecepatan ayun untuk kekuatan pukulan dan spin
   for (const p of ['h', 'g']) {
     const b = batOf(S, p), q = prevBat[p];
@@ -411,19 +415,20 @@ function tick(now) {
   requestAnimationFrame(tick); // dijadwalkan dulu: error di satu frame tidak boleh membekukan game
   const dt = Math.min((now - prev) / 1000, .033); prev = now;
   const duo = role === 'duo', W = cv.clientWidth, H = cv.clientHeight, aspect = duo ? W / 2 / H : W / H;
-  readPose(vid, trackers, {hand: $('hand').value, hand2: [$('hand').value, $('hand').value], smooth: +$('smooth').value, pitch: $('pitch').checked});
+  readPose(vid, trackers, {hand: $('hand').value, hand2: [$('hand').value, $('hand').value], smooth: +$('smooth').value, pitch: $('pitch').checked, head: headOn()});
 
   // nilai tangan tiap sisi lokal, dikejar tiap frame layar
   const kf = 1 - Math.exp(-60 * dt);
   const src = duo ? {h: trackers[0].fil, g: trackers[1].fil} : {[ownSide()]: mouseCtl() ? mouse : trackers[0].fil};
-  const own = {};
-  for (const side in src) { for (const k in mine[side]) mine[side][k] += (src[side][k] - mine[side][k]) * kf; own[side] = toWorld(side, mine[side], aspect); }
+  const head = !headOn() ? {} : duo ? {h: trackers[0].head, g: trackers[1].head} : {[ownSide()]: trackers[0].head};
+  const own = {}, eye = {};
+  for (const side in src) { eye[side] = head[side] || ZERO; for (const k in mine[side]) mine[side][k] += (src[side][k] - mine[side][k]) * kf; own[side] = toWorld(side, mine[side], aspect, eye[side]); }
 
   const stale = conn && now - rxT > 2000; // lawan pindah tab atau jaringan macet: tahan permainan
   if (conn && now - rxT > 30000) fail('Lawan tidak merespons. Buat room baru atau gabung lagi.');
   const local = role === 'cpu' || role === 'duo' || (role === 'host' && conn);
   if (local && !S.paused && !stale && !calMsg && !replay) {
-    for (const side in own) setBat(side, own[side]);
+    for (const side in own) { setBat(side, own[side]); S[side + 'ex'] = eye[side].x; S[side + 'ey'] = eye[side].y; }
     if (duo) { S.hh = trackers[0].hand; S.gh = trackers[1].hand; } else S.hh = myHand(); // komputer: tangan kanan dari newState
     if (cpu) cpu.think(S, dt);
     if (tut) tutTick(dt, own.h); // sebelum measureSwing: tutTick membaca posisi bat frame sebelumnya
@@ -449,8 +454,8 @@ function tick(now) {
     } else if (S.ph !== 'play') rec.length = 0;
   } else if (role === 'guest' && conn && conn.open) {
     measureSwingGuest(own.g, dt);
-    guestTick(dt, own.g);
-    send({t: 'p', n: ++txN, ...own.g, h: myHand()});
+    guestTick(dt, own.g, eye.g);
+    send({t: 'p', n: ++txN, ...own.g, h: myHand(), ex: eye.g.x, ey: eye.g.y});
     if (now - lastPose > 1000) { lastPose = now; send({t: 'ping', c: now}); }
   }
   if (role === 'host' && conn && conn.open) send({t: 's', n: ++txN, s: S});
@@ -469,7 +474,8 @@ function tick(now) {
     for (const side in own) bats[side] = own[side]; // bat sendiri selalu dari input lokal, tanpa menunggu jaringan
   }
   const views = replay ? [{side: 'tv', x: 0, y: 0, w: 1, h: 1}] : duo ? [{side: 'h', x: 0, y: 0, w: .5, h: 1}, {side: 'g', x: .5, y: 0, w: .5, h: 1}] : [{side: ownSide(), x: 0, y: 0, w: 1, h: 1}];
-  view.draw({D, bats, views, hands: duo ? {h: S.hh, g: S.gh} : {h: S.hh, g: S.gh, [ownSide()]: myHand()}, inGame: !!role && screenNow !== 'wait', dt, reduced: reduced.matches});
+  view.draw({D, bats, views, hands: duo ? {h: S.hh, g: S.gh} : {h: S.hh, g: S.gh, [ownSide()]: myHand()},
+    eyes: replay ? {h: ZERO, g: ZERO} : {h: {x: S.hex, y: S.hey}, g: {x: S.gex, y: S.gey}, ...eye}, inGame: !!role && screenNow !== 'wait', dt, reduced: reduced.matches});
   hud();
   drawPip();
 
