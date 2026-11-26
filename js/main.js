@@ -44,13 +44,14 @@ const status = t => $('st').textContent = t;
 const myName = d => $('name').value.trim() || d;
 
 // ---------- layar ----------
-const PANELS = ['menu', 'wait', 'pause', 'result', 'karier', 'stats'];
+const PANELS = ['menu', 'wait', 'pause', 'result', 'karier', 'stats', 'settings'];
+let setFrom = 'menu'; // layar asal pengaturan: menu atau jeda
 function go(to) {
   screenNow = to; document.body.dataset.screen = to;
   for (const id of PANELS) $(id).hidden = id !== to;
-  $('hud').hidden = !['main', 'pause', 'result'].includes(to);
-  if (to === 'menu') { $('menu').append($('set')); menuHighlight(); }
-  if (to === 'pause') $('setHere').append($('set'));
+  $('hud').hidden = !['main', 'pause', 'result'].includes(to) && !(to === 'settings' && setFrom === 'pause');
+  if (to === 'menu') { menuHighlight(); ringkas(); }
+  if (to === 'settings') document.querySelectorAll('select.seg').forEach(s => s._draw());
   if (document.activeElement) document.activeElement.blur(); // supaya Spasi tidak menekan tombol yang sudah hilang
 }
 function menuHighlight() { // pemain baru diarahkan ke tutorial
@@ -98,6 +99,36 @@ $('tut').onclick = async () => {
   tut = {i: 0, base: null}; await playLocal(); if (tut) tutEnter();
 };
 $('kar').onclick = () => { renderKarier(); go('karier'); };
+const openSettings = from => { setFrom = from; go('settings'); $('setBack').focus(); };
+$('setBtn').onclick = () => openSettings('menu'); $('setBtn2').onclick = () => openSettings('pause');
+$('setBack').onclick = () => go(setFrom);
+
+// Pilihan pendek tampil sebagai tombol segmen; <select> asli tetap sumber nilai dan pemicu 'change', jadi logika lain tidak berubah.
+function segmen(sel) {
+  const box = document.createElement('div');
+  box.className = 'segmen'; box.setAttribute('role', 'radiogroup');
+  if (sel.getAttribute('aria-labelledby')) box.setAttribute('aria-labelledby', sel.getAttribute('aria-labelledby'));
+  sel._draw = () => {
+    box.textContent = '';
+    for (const o of sel.options) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.textContent = o.dataset.short || o.textContent; b.title = o.textContent;
+      b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', String(o.value === sel.value)); b.disabled = sel.disabled;
+      b.onclick = () => { if (sel.value === o.value) return; sel.value = o.value; sel.dispatchEvent(new Event('change')); sel._draw(); };
+      box.append(b);
+    }
+  };
+  sel.hidden = true; sel.after(box); sel.addEventListener('change', () => sel._draw()); sel._draw();
+}
+// ringkasan setelan di tombol utama, dan keterangan bantuan pukulan
+const ASSIST = {'-1': 'Paling mudah: bola selalu masuk, servis bola diam tanpa lemparan, boleh volley.', '0': 'Bola selalu masuk, dengan aturan servis asli (lempar, pantul di meja sendiri).',
+  '0.6': 'Sesekali gagal: kontak di pinggir bat, ayunan terlalu keras, atau spin lawan bisa membuat bola keluar.', '1': 'Seperti tenis meja sungguhan: kesalahan lebih sering dan lemparan servis harus cukup tinggi.'};
+function ringkas() {
+  const opt = id => { const s = $(id); return (s.options[s.selectedIndex].dataset.short || s.options[s.selectedIndex].textContent); };
+  setText('ringkas', `Level ${opt('lvl').toLowerCase()} · ${opt('win')} · ${opt('assist')}`);
+  setText('assistK', ASSIST[$('assist').value] || '');
+}
+for (const id of ['lvl', 'win', 'assist']) $(id).addEventListener('change', ringkas);
 $('karBack').onclick = $('statBack').onclick = () => go('menu');
 $('stat').onclick = () => { renderStats(); go('stats'); };
 
@@ -110,9 +141,10 @@ function renderKarier() {
   LAWAN.forEach((o, i) => {
     const b = document.createElement('button'), done = i < prog.karier, open = i <= prog.karier;
     b.className = 'lawan' + (i === prog.karier ? ' utama' : ''); b.disabled = !open;
-    b.innerHTML = `<b></b><small></small>`;
-    b.firstChild.textContent = (done ? '✓ ' : open ? '' : '🔒 ') + o.nama;
-    b.lastChild.textContent = open ? o.gaya : `Kalahkan ${LAWAN[i - 1].nama} dulu`;
+    b.innerHTML = `<b></b><small></small><span class="tanda"></span>`;
+    b.children[0].textContent = o.nama;
+    b.children[1].textContent = open ? o.gaya : `Kalahkan ${LAWAN[i - 1].nama} dulu`;
+    b.children[2].textContent = done ? 'Menang ✓' : open ? 'Main' : 'Terkunci';
     b.onclick = () => startKarier(i); L.append(b);
   });
 }
@@ -120,7 +152,7 @@ function renderStats() {
   const s = prog.stats, D = $('stDl'); D.textContent = '';
   for (const [k, v] of [['Pertandingan', s.main], ['Menang', s.menang], ['Pukulan kena', s.pukulan], ['Smash', s.smash], ['Topspin', s.topspin],
     ['Reli terpanjang', s.reli], ['Bola masuk (latihan)', s.latihan], ['Lama main', Math.round(s.detik / 60) + ' menit']]) {
-    const dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = k; dd.textContent = v; D.append(dt, dd);
+    const w = document.createElement('div'), dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = k; dd.textContent = v; w.append(dt, dd); D.append(w);
   }
   const U = $('achL'); U.textContent = '';
   for (const a of store.ACH) {
@@ -610,5 +642,6 @@ function drawPip() {
 window.telapakLog = () => { const L = store.readLog(); console.table(L.slice(-20)); return JSON.stringify(L); };
 if (new URLSearchParams(location.search).has('debug')) window.__telapak = {get S() { return S; }, get replay() { return replay; }, prog}; // untuk uji otomatis
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { /* tanpa offline pun game tetap jalan */ });
-menuHighlight();
+document.querySelectorAll('select.seg').forEach(segmen);
+menuHighlight(); ringkas();
 requestAnimationFrame(tick);

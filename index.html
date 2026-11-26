@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=Barlow:wght@400;600&display=swap">
 <style>
-  :root{--lantai:#5a1a1c;--meja:#0b4a9e;--karet:#c8102e;--bola:#ff9a3c;--garis:#f7f9fc;--hitam:#15171b;color-scheme:dark}
+  :root{--lantai:#5a1a1c;--meja:#0b4a9e;--karet:#c8102e;--bola:#ff9a3c;--garis:#f7f9fc;--hitam:#15171b;--isi:#262a31;--isi-2:#343943;color-scheme:dark}
   *{box-sizing:border-box}
   html,body{height:100%;margin:0;overflow:hidden;background:var(--lantai);color:var(--garis);font:16px/1.45 Barlow,system-ui,sans-serif}
   h1,h2,.card,#msg,#rally,.big{font-family:"Barlow Condensed","Arial Narrow",sans-serif;font-weight:700}
@@ -44,31 +44,87 @@
   #pip video{transform:scaleX(-1);opacity:.8}
   #tools{position:absolute;top:14px;right:14px;display:flex;gap:8px}
 
-  button,input,select{font:600 16px Barlow,system-ui,sans-serif;min-height:44px;padding:8px 14px;border-radius:8px;border:0;color:var(--garis);background:#2a2d34;touch-action:manipulation}
-  button{cursor:pointer}button:hover{background:#3a3e47}
-  button.utama{background:var(--karet)}button.utama:hover{background:#e0233f}
-  button:disabled{opacity:.45;cursor:default}
+  /* ---------- kontrol ---------- */
+  button,input,select{font:600 16px Barlow,system-ui,sans-serif;min-height:44px;padding:8px 14px;border-radius:10px;border:0;color:var(--garis);background:var(--isi);touch-action:manipulation}
+  button{cursor:pointer;transition:background-color .18s,transform .12s,box-shadow .18s}
+  button:hover:not(:disabled){background:var(--isi-2)}
+  button:active:not(:disabled){transform:translateY(1px) scale(.985)}
+  button.utama{background:var(--karet);box-shadow:0 3px 0 #7d0a1d}button.utama:hover:not(:disabled){background:#de2340}
+  button.teks{background:none;padding:8px 6px;color:#c9ced8;font-weight:600}button.teks:hover:not(:disabled){background:none;color:var(--garis);text-decoration:underline;text-underline-offset:4px}
+  button.bahaya{background:none;box-shadow:inset 0 0 0 2px #ffffff26;color:#f3b4bd}button.bahaya:hover:not(:disabled){background:#c8102e2e}
+  button:disabled{opacity:.42;cursor:default}
   :focus-visible{outline:3px solid var(--bola);outline-offset:2px}
-  .panel{position:absolute;left:clamp(16px,5vw,72px);top:50%;transform:translateY(-50%);width:min(430px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow:auto;overscroll-behavior:contain;background:#15171bf0;border-radius:14px;border-left:10px solid var(--karet);padding:26px}
-  .panel h1{font-size:64px;line-height:.95;margin:0}
-  .panel h2{font-size:46px;line-height:1;margin:0 0 10px;overflow-wrap:anywhere}
-  .panel h3{font-size:20px;margin:18px 0 6px}
-  .panel p{margin:8px 0 18px}
+  kbd{font:600 12px/1 Barlow,system-ui,sans-serif;padding:3px 6px;border-radius:5px;background:#ffffff1f;margin-left:auto;letter-spacing:.02em}
+  input[type=text],input:not([type]){background:#0d0f13;box-shadow:inset 0 0 0 1px #ffffff1f}
+  input:not([type]):focus{box-shadow:inset 0 0 0 2px var(--bola)}
+  ::placeholder{color:#8f96a3;opacity:1}
+
+  /* ---------- panel ---------- */
+  .panel{position:absolute;left:clamp(12px,4vw,64px);top:50%;transform:translateY(-50%);width:min(420px,calc(100vw - 24px));max-height:calc(100dvh - 24px);overflow:auto;overscroll-behavior:contain;
+    background:linear-gradient(180deg,#1b1e24f5,#121418f5);border-radius:18px;box-shadow:0 20px 60px #0009,inset 0 1px 0 #ffffff14;padding:24px 24px 18px;scrollbar-width:thin;animation:muncul .22s ease-out}
+  .panel.lebar{width:min(520px,calc(100vw - 24px))}
+  @keyframes muncul{from{opacity:0;transform:translateY(calc(-50% + 10px))}}
+  .panel h1{font-size:60px;line-height:.9;margin:0;letter-spacing:-.01em}
+  .panel h1 i{font-style:normal;color:var(--bola)}
+  .panel h2{font-size:42px;line-height:1;margin:0 0 14px;overflow-wrap:anywhere;letter-spacing:-.01em}
+  .sub{margin:6px 0 18px;color:#c9ced8}
+  .panel p{margin:8px 0 16px}
+  .panel .sek{font:600 13px/1 Barlow,system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#9aa1ad;margin:20px 0 8px}
+  .tumpuk{display:grid;gap:8px}
+  .kisi3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
   .baris{display:flex;gap:8px;margin:10px 0}.baris>*{flex:1;min-width:0}
-  label.f{display:flex;flex-direction:column;gap:4px;font-size:14px;margin:10px 0}
-  label.c{display:flex;gap:10px;align-items:center;min-height:44px}
-  input[type=checkbox]{min-height:0;width:20px;height:20px}input[type=range]{padding:0}
-  #st{min-height:1.45em;font-weight:600;color:var(--bola)}
-  summary{cursor:pointer;line-height:44px;font-weight:600}
-  ::placeholder{color:#aab0bc;opacity:1}
+  .online{display:grid;grid-template-columns:auto 1fr auto;gap:8px;margin-top:8px}
+  .online input{min-width:0;text-align:center;letter-spacing:.2em;font-variant-numeric:tabular-nums}
+  button.besar{width:100%;display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:14px 18px;text-align:left;font-size:22px}
+  button.besar small{font-weight:500;font-size:14px;opacity:.9}
+  .daftar{display:grid;gap:8px;margin-top:10px}.daftar button{display:flex;align-items:center;gap:10px;text-align:left}
+  .kaki{display:flex;justify-content:space-between;gap:8px;margin-top:16px;padding-top:10px;border-top:1px solid #ffffff14}
+  label.f{display:flex;flex-direction:column;gap:6px;font-size:14px;color:#c9ced8;margin:0 0 12px}
+  #st{min-height:1.45em;font-weight:600;color:var(--bola);margin-top:10px}
+  #st:empty{min-height:0;margin:0}
+  details.bantu{margin-top:14px;font-size:15px;color:#c9ced8}
+  details.bantu ul{margin:4px 0 0;padding-left:18px}details.bantu li{margin:4px 0}
+  summary{cursor:pointer;line-height:40px;font-weight:600;color:var(--garis);list-style-position:inside}
   #kode{font-size:96px;line-height:1;letter-spacing:.06em;color:var(--bola)}
-  dl{display:grid;grid-template-columns:1fr auto;gap:6px 16px;margin:0 0 18px;font-variant-numeric:tabular-nums}dd{margin:0;font-weight:600}
-  .lawan{display:flex;flex-direction:column;align-items:flex-start;width:100%;text-align:left;margin:6px 0}
-  .lawan small{font-weight:400;opacity:.85}
-  #achL{list-style:none;padding:0;margin:0 0 18px}#achL li{padding:4px 0;opacity:.55}#achL li.buka{opacity:1}#achL span{font-size:14px}
-  @media (prefers-reduced-motion:reduce){.card.flip,#toast{animation:none}}
-  @media (max-height:680px){#goal{display:none}#msg{top:106px;font-size:28px}}
-  @media (max-width:700px){.card{width:54px;height:62px;font-size:46px}.nm{font-size:18px}#goal{top:84px}#msg{top:108px}#tools{top:auto;bottom:14px}#fps{display:none}#tip{bottom:76px;font-size:16px}}
+  dl{display:grid;grid-template-columns:1fr auto;gap:8px 16px;margin:0 0 18px;font-variant-numeric:tabular-nums}dt{color:#c9ced8}dd{margin:0;font-weight:600}
+
+  /* ---------- pengaturan ---------- */
+  .tetap{position:sticky;bottom:-18px;margin:8px -24px -18px;padding:12px 24px 18px;background:linear-gradient(#12141800,#121418 30%)}
+  fieldset{border:0;margin:0 0 6px;padding:0}
+  legend{font:600 13px/1 Barlow,system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#9aa1ad;padding:0;margin:14px 0 10px}
+  .opsi{margin:0 0 14px}
+  .lbl{display:block;font-size:15px;font-weight:600;margin-bottom:6px}
+  .ket{font-size:13.5px;color:#aab0bc;margin:6px 0 0;line-height:1.4}
+  .segmen{display:flex;padding:3px;gap:3px;border-radius:12px;background:#0d0f13;box-shadow:inset 0 0 0 1px #ffffff14}
+  .segmen button{flex:1;min-width:0;min-height:38px;padding:6px 8px;border-radius:9px;background:none;font-size:15px;color:#c9ced8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .segmen button:hover:not(:disabled){background:#ffffff12;color:var(--garis)}
+  .segmen button[aria-checked=true]{background:var(--isi-2);color:var(--garis);box-shadow:0 1px 0 #ffffff1a inset,0 2px 6px #0006}
+  .segmen button[aria-checked=true]:hover{background:var(--isi-2)}
+  /* sakelar dari checkbox */
+  label.c{display:flex;gap:12px;align-items:center;justify-content:space-between;min-height:48px;cursor:pointer;font-size:15px;font-weight:600}
+  label.c small{display:block;font-weight:400;font-size:13.5px;color:#aab0bc}
+  input[type=checkbox]{appearance:none;flex:none;width:46px;height:28px;min-height:0;padding:0;border-radius:99px;background:#3a3e47;position:relative;cursor:pointer;transition:background-color .18s}
+  input[type=checkbox]::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#e7eaf0;transition:transform .18s}
+  input[type=checkbox]:checked{background:var(--karet)}input[type=checkbox]:checked::after{transform:translateX(18px)}
+  input[type=range]{width:100%;padding:0;accent-color:var(--karet);background:none;min-height:32px}
+
+  /* ---------- karier dan statistik ---------- */
+  .lawan{display:grid;grid-template-columns:1fr auto;align-items:center;column-gap:10px;width:100%;text-align:left;margin:0 0 8px;padding:12px 16px}
+  .lawan b{font-size:18px}.lawan small{grid-column:1;font-weight:400;font-size:14px;opacity:.85}
+  .lawan .tanda{grid-row:1/3;grid-column:2;font-size:13px;font-weight:600;opacity:.85}
+  #stDl{grid-template-columns:repeat(2,1fr);gap:8px}#stDl div{background:#0d0f13;border-radius:12px;padding:10px 12px}
+  #stDl dt{font-size:13px}#stDl dd{font:700 28px/1.1 "Barlow Condensed","Arial Narrow",sans-serif}
+  #achL{list-style:none;padding:0;margin:0 0 18px;display:grid;gap:6px}#achL li{padding:8px 12px;border-radius:10px;background:#0d0f13;opacity:.5}#achL li.buka{opacity:1;box-shadow:inset 3px 0 0 #facc15}#achL span{display:block;font-size:13.5px;color:#aab0bc}
+  .panel h3{font-size:20px;margin:18px 0 8px}
+
+  /* ---------- tombol ikon saat main ---------- */
+  #tools button{width:44px;padding:0;display:grid;place-items:center;background:#15171bcc;backdrop-filter:blur(6px);box-shadow:inset 0 0 0 1px #ffffff1a}
+  #tools button:hover{background:#2a2d34e6}
+  #tools svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+  @media (prefers-reduced-motion:reduce){.card.flip,#toast,.panel{animation:none}button{transition:none}}
+  @media (max-height:680px){#goal{display:none}#msg{top:106px;font-size:28px}.panel{padding:18px 18px 12px}.panel h1{font-size:46px}.sub{margin-bottom:12px}}
+@media (max-width:700px){.card{width:54px;height:62px;font-size:46px}.nm{font-size:18px}#goal{top:84px}#msg{top:108px}#tools{top:auto;bottom:14px}#fps{display:none}#tip{bottom:76px;font-size:16px}}
 </style>
 <body data-screen="menu">
 <div id="stage">
@@ -76,7 +132,7 @@
   <div id="hud" hidden>
     <div id="board"><span class="nm" id="nmL"></span><span class="card" id="cL">0</span><span class="card" id="cR">0</span><span class="nm" id="nmR"></span></div>
     <div id="goal"></div><div id="rally"></div>
-    <div id="tools"><button id="pauseBtn" title="Tombol P">Jeda</button><button id="cal" title="Tombol K">Kalibrasi</button><button id="full" title="Tombol F">Layar penuh</button></div>
+    <div id="tools"><button id="pauseBtn" title="Jeda (P)" aria-label="Jeda"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5v14M15 5v14"/></svg></button><button id="cal" title="Kalibrasi ulang (K)" aria-label="Kalibrasi ulang"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button><button id="full" title="Layar penuh (F)" aria-label="Layar penuh"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button></div>
   </div>
   <div id="fps"></div>
   <div id="msg" role="status" aria-live="polite"></div>
@@ -84,40 +140,58 @@
   <div id="toast" role="status" hidden></div>
   <div id="pip"><video id="vid" playsinline muted></video><canvas id="dots" width="160" height="120"></canvas></div>
 
-  <section class="panel" id="menu">
-    <h1>Telapak</h1>
-    <p>Tenis meja tanpa bat. Tanganmu yang memukul.</p>
+  <section class="panel" id="menu" aria-labelledby="judul">
+    <h1 id="judul">Telapak<i>.</i></h1>
+    <p class="sub">Tenis meja tanpa bat. Tanganmu yang memukul.</p>
     <label class="f">Nama pemain atau tim<input id="name" maxlength="14" autocomplete="off" spellcheck="false" placeholder="Contoh: Tim Garuda…"></label>
-    <label class="f">Kontrol<select id="ctrl"><option value="kamera">Kamera: telapak tangan</option><option value="mouse">Mouse atau sentuh</option></select></label>
-    <div class="baris"><button id="tut">Tutorial</button><button id="lat">Latihan</button></div>
-    <div class="baris"><button class="utama" id="cpu">Lawan komputer</button><button id="kar">Karier</button></div>
-    <div class="baris"><button id="duo">Berdua, satu kamera</button></div>
-    <div class="baris"><button id="host">Buat room</button></div>
-    <div class="baris"><input id="code" aria-label="Kode room 4 digit" placeholder="Kode room…" maxlength="4" inputmode="numeric" autocomplete="off"><button id="join">Gabung</button></div>
+    <div class="opsi"><span class="lbl" id="ctrlL">Kontrol</span><select id="ctrl" class="seg" aria-labelledby="ctrlL"><option value="kamera" data-short="Kamera">Kamera: telapak tangan</option><option value="mouse" data-short="Mouse / sentuh">Mouse atau sentuh</option></select></div>
+    <button class="utama besar" id="cpu">Lawan komputer<small id="ringkas"></small></button>
+    <div class="kisi3"><button id="kar">Karier</button><button id="lat">Latihan</button><button id="tut">Tutorial</button></div>
+    <h3 class="sek">Main bersama</h3>
+    <div class="tumpuk"><button id="duo">Berdua, satu kamera</button></div>
+    <div class="online"><button id="host">Buat room</button><input id="code" aria-label="Kode room 4 digit" placeholder="Kode" maxlength="4" inputmode="numeric" autocomplete="off"><button id="join">Gabung</button></div>
     <div id="st" role="status" aria-live="polite"></div>
-    <p>Kamera: berdiri 1,5 sampai 2 meter dari laptop. Kepala, bahu, dan tangan harus terlihat. Pastikan ruang di sekitarmu kosong. Video tidak dikirim keluar dari laptop ini. Mouse: gerakkan kursor, roda mouse memajukan bat.</p>
-    <div class="baris"><button id="stat">Statistik dan pencapaian</button></div>
-    <details id="set"><summary>Pengaturan</summary>
-      <label class="f">Level komputer (tanding cepat)<select id="lvl"><option value="1.2" selected>Mudah</option><option value="2.2">Sedang</option><option value="4">Sulit</option></select></label>
-      <label class="f">Main sampai<select id="win"><option value="7" selected>7 poin</option><option value="11">11 poin</option><option value="21">21 poin</option></select></label>
-      <label class="f">Bantuan pukulan<select id="assist"><option value="-1" selected>Arkade: paling mudah, seperti versi awal</option><option value="0">Penuh: bola selalu masuk</option><option value="0.6">Normal</option><option value="1">Realistis</option></select></label>
-      <label class="f">Kecepatan bola<select id="spd"><option value="1.8">Sangat pelan</option><option value="1.4">Pelan</option><option value="1" selected>Normal</option></select></label>
-      <label class="f">Tangan<select id="hand"><option value="auto" selected>Otomatis (tangan yang diangkat)</option><option value="R">Kanan</option><option value="L">Kiri</option></select></label>
-      <label class="f">Kehalusan gerak<input type="range" id="smooth" min="0" max="1" step="0.05" value="0.5"></label>
-      <label class="f">Akurasi model (pilih sebelum mulai)<select id="acc"><option value="lite" selected>Cepat</option><option value="full">Sedang</option><option value="heavy">Tinggi</option></select></label>
-      <label class="c"><input type="checkbox" id="headpov" checked> Sudut pandang ikut kepala</label>
-      <label class="c"><input type="checkbox" id="pitch"> Pitch bat (eksperimental)</label>
-      <label class="c"><input type="checkbox" id="replay" checked> Tayangan ulang reli panjang dan smash</label>
-      <label class="c"><input type="checkbox" id="sound" checked> Suara</label>
-      <label class="f">Broker sendiri (opsional)<input id="broker" autocomplete="off" spellcheck="false" placeholder="192.168.1.5:9000…"></label>
-    </details>
+    <details class="bantu"><summary>Cara main</summary><ul>
+      <li>Berdiri 1,5 sampai 2 meter dari laptop. Kepala, bahu, dan kedua tangan harus terlihat kamera.</li>
+      <li>Telapak tangan pemukul adalah bat. Tangan satunya melempar bola saat servis.</li>
+      <li>Pastikan ruang di sekitarmu kosong. Video tidak dikirim keluar dari laptop ini.</li>
+      <li>Mouse: gerakkan kursor, roda mouse memajukan bat.</li></ul></details>
+    <nav class="kaki" aria-label="Lainnya"><button class="teks" id="stat">Statistik dan pencapaian</button><button class="teks" id="setBtn">Pengaturan</button></nav>
   </section>
 
-  <section class="panel" id="karier" hidden><h2>Karier</h2><p>Kalahkan lawan satu per satu. Tiap lawan punya gaya main sendiri.</p><div id="kList"></div><div class="baris"><button id="karBack">Kembali</button></div></section>
-  <section class="panel" id="stats" hidden><h2>Statistik</h2><dl id="stDl"></dl><h3>Pencapaian</h3><ul id="achL"></ul><div class="baris"><button id="statBack">Kembali</button></div></section>
+  <section class="panel lebar" id="settings" hidden aria-labelledby="setJ">
+    <h2 id="setJ">Pengaturan</h2>
+    <div id="set">
+      <fieldset><legend>Permainan</legend>
+        <div class="opsi"><span class="lbl" id="assistL">Bantuan pukulan</span><select id="assist" class="seg" aria-labelledby="assistL"><option value="-1" selected data-short="Arkade">Arkade: paling mudah, seperti versi awal</option><option value="0" data-short="Penuh">Penuh: bola selalu masuk</option><option value="0.6" data-short="Normal">Normal</option><option value="1" data-short="Realistis">Realistis</option></select><p class="ket" id="assistK"></p></div>
+        <div class="opsi"><span class="lbl" id="lvlL">Level komputer (tanding cepat)</span><select id="lvl" class="seg" aria-labelledby="lvlL"><option value="1.2" selected>Mudah</option><option value="2.2">Sedang</option><option value="4">Sulit</option></select></div>
+        <div class="opsi"><span class="lbl" id="winL">Main sampai</span><select id="win" class="seg" aria-labelledby="winL"><option value="7" selected>7 poin</option><option value="11">11 poin</option><option value="21">21 poin</option></select></div>
+        <div class="opsi"><span class="lbl" id="spdL">Kecepatan bola</span><select id="spd" class="seg" aria-labelledby="spdL"><option value="1.8">Sangat pelan</option><option value="1.4">Pelan</option><option value="1" selected>Normal</option></select></div>
+      </fieldset>
+      <fieldset><legend>Kamera</legend>
+        <div class="opsi"><span class="lbl" id="handL">Tangan pemukul</span><select id="hand" class="seg" aria-labelledby="handL"><option value="auto" selected data-short="Otomatis">Otomatis (tangan yang diangkat)</option><option value="R">Kanan</option><option value="L">Kiri</option></select><p class="ket">Otomatis: tangan yang diangkat saat kalibrasi.</p></div>
+        <div class="opsi"><span class="lbl" id="accL">Akurasi model</span><select id="acc" class="seg" aria-labelledby="accL"><option value="lite" selected>Cepat</option><option value="full">Sedang</option><option value="heavy">Tinggi</option></select><p class="ket">Dipilih sebelum mulai. Untuk menggantinya setelah kamera menyala, muat ulang halaman.</p></div>
+        <label class="f">Kehalusan gerak<input type="range" id="smooth" min="0" max="1" step="0.05" value="0.5"></label>
+        <label class="c"><span>Sudut pandang ikut kepala<small>Condong atau merunduk menggeser kamera.</small></span><input type="checkbox" id="headpov" checked></label>
+        <label class="c"><span>Pitch bat (eksperimental)<small>Condongkan jari untuk menutup atau membuka bilah.</small></span><input type="checkbox" id="pitch"></label>
+      </fieldset>
+      <fieldset><legend>Tampilan dan suara</legend>
+        <label class="c"><span>Tayangan ulang<small>Reli panjang dan smash diputar ulang pelan.</small></span><input type="checkbox" id="replay" checked></label>
+        <label class="c"><span>Suara</span><input type="checkbox" id="sound" checked></label>
+      </fieldset>
+      <details><summary>Lanjutan</summary><label class="f">Broker sendiri (opsional)<input id="broker" autocomplete="off" spellcheck="false" placeholder="192.168.1.5:9000…"></label></details>
+    </div>
+    <div class="baris tetap"><button class="utama" id="setBack">Selesai</button></div>
+  </section>
+
+  <section class="panel" id="karier" hidden><h2>Karier</h2><p>Kalahkan lawan satu per satu. Tiap lawan punya gaya main dan kelemahan sendiri.</p><div id="kList"></div><div class="baris"><button id="karBack">Kembali</button></div></section>
+  <section class="panel lebar" id="stats" hidden><h2>Statistik</h2><dl id="stDl"></dl><h3>Pencapaian</h3><ul id="achL"></ul><div class="baris"><button id="statBack">Kembali</button></div></section>
   <section class="panel" id="wait" hidden><h2>Room siap</h2><p>Minta lawan mengetik kode ini di laptopnya, lalu klik Gabung.</p><div id="kode" class="big"></div><p id="waitSt">Menunggu lawan…</p><button id="cancel">Batal</button></section>
-  <section class="panel" id="pause" hidden><h2>Jeda</h2><div class="baris"><button class="utama" id="resume">Lanjut (Spasi)</button></div><div class="baris"><button id="cal2">Kalibrasi ulang</button><button id="calFull" title="Tombol L">Kalibrasi lengkap</button><button id="quit">Keluar</button></div><div id="setHere"></div></section>
-  <section class="panel" id="result" hidden><h2 id="resT"></h2><dl><dt>Skor</dt><dd id="resS"></dd><dt>Reli terpanjang</dt><dd id="resR"></dd><dt>Lama main</dt><dd id="resD"></dd></dl><p id="resNext"></p><div class="baris"><button class="utama" id="again">Main lagi (Spasi)</button><button id="next" hidden>Lawan berikutnya</button><button id="quit2">Keluar</button></div></section>
+  <section class="panel" id="pause" hidden><h2>Jeda</h2>
+    <button class="utama besar" id="resume">Lanjut<small>Tombol Spasi</small></button>
+    <div class="daftar"><button id="cal2">Kalibrasi ulang <kbd>K</kbd></button><button id="calFull">Kalibrasi lengkap <kbd>L</kbd></button><button id="setBtn2">Pengaturan</button><button class="bahaya" id="quit">Keluar ke menu</button></div>
+  </section>
+  <section class="panel" id="result" hidden><h2 id="resT"></h2><dl><dt>Skor</dt><dd id="resS"></dd><dt>Reli terpanjang</dt><dd id="resR"></dd><dt>Lama main</dt><dd id="resD"></dd></dl><p id="resNext"></p><button class="utama besar" id="again">Main lagi<small>Tombol Spasi</small></button><div class="daftar"><button id="next" hidden>Lawan berikutnya</button><button class="bahaya" id="quit2">Keluar ke menu</button></div></section>
 </div>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script type="module" src="js/main.js"></script>
