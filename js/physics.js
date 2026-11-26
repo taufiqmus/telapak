@@ -29,6 +29,19 @@ export function palmPitch(wr, ix, pk) {
   const mx = (ix.x + pk.x) / 2 - wr.x, my = (ix.y + pk.y) / 2 - wr.y, mz = (ix.z + pk.z) / 2 - wr.z;
   return Math.atan2(-mz, Math.hypot(mx, my));
 }
+// Kalibrasi lengkap: rentang gerak pribadi. Tiap sumbu [ujung bawah, netral, ujung atas] dalam nilai mentah tracker
+// (x layar dicerminkan, y gambar ke bawah, z meter relatif bahu, makin negatif makin ke depan).
+// Ujung dipersempit 15% ke arah netral supaya tepi meja tercapai tanpa meregang penuh. Sumbu yang terlalu sempit = null (pakai bawaan).
+export const CAL_MIN = {x: .06, y: .06, z: .04};
+export function calRange(n, s) {
+  const ax = (k, lo, hi) => {
+    const a = n[k] + (lo - n[k]) * .85, b = n[k] + (hi - n[k]) * .85;
+    return n[k] - a >= CAL_MIN[k] * .85 && b - n[k] >= CAL_MIN[k] * .85 ? [a, n[k], b] : null;
+  };
+  return {x: ax('x', s.kiri.x, s.kanan.x), y: ax('y', s.atas.y, s.bawah.y), z: ax('z', s.depan.z, s.belakang.z)};
+}
+// Nilai mentah -> 0..1 sepotong-sepotong: ujung bawah 0, netral 0,5, ujung atas 1.
+export const seg = (v, [lo, mid, hi]) => v < mid ? clamp(.5 - .5 * (mid - v) / (mid - lo)) : clamp(.5 + .5 * (v - mid) / (hi - mid));
 // Backhand: bat di sisi badan yang berlawanan dengan tangan pemukul, dilihat dari pemain itu sendiri.
 // prev = hasil frame sebelumnya; ambang ganda (histeresis) supaya bat tidak berkedip saat di tengah badan.
 export function backhand(side, x, hand, prev = false) {

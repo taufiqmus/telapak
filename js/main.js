@@ -1,5 +1,5 @@
 // Perekat: layar menu, mode permainan, input, loop utama, duel jaringan.
-import {newState, startRound, step, tryHit, applyHit, canHit, batOf, fly, handToBat, ndcToHand, clamp, backhand, NET_TOP, PROTO} from './physics.js';
+import {newState, startRound, step, tryHit, applyHit, canHit, batOf, fly, handToBat, ndcToHand, clamp, backhand, calRange, NET_TOP, PROTO} from './physics.js';
 import {Tracker, loadPose, readPose, setPeople, poseStat} from './pose.js';
 import {Cpu, LAWAN, quick, MESIN} from './cpu.js';
 import {createScene, COLOR} from './scene.js';
@@ -237,7 +237,48 @@ async function calibrate() {
     await sleep(100);
   }
   ts.forEach(t => t.calDone()); calMsg = '';
+  if (!two) ts[0].range = calStore()[ts[0].hand] || null; // rentang pribadi per tangan dari kalibrasi lengkap
 }
+
+// Kalibrasi lengkap: pemain memegang bat di beberapa posisi ekstrem, hasilnya jadi rentang gerak pribadi (tersimpan di laptop ini).
+const CALKEY = 'telapak-cal';
+const calStore = () => { try { return JSON.parse(localStorage.getItem(CALKEY)) || {}; } catch { return {}; } };
+const LANGKAH = [
+  ['kanan', 'jangkau sejauh mungkin ke KANAN'], ['kiri', 'jangkau sejauh mungkin ke KIRI (backhand)'],
+  ['atas', 'angkat bat setinggi mungkin'], ['bawah', 'turunkan bat serendah meja'],
+  ['depan', 'dorong bat ke DEPAN, ke arah layar'], ['belakang', 'tarik bat ke BELAKANG, dekat badan']
+];
+async function holdRaw(t, label) { // median 12 frame baru selagi telapak terlihat
+  const buf = []; let last = null;
+  while (buf.length < 12 && role) {
+    calMsg = t.palm ? label + ' Tahan…' : 'Tangan belum terlihat. Mundur sedikit.';
+    if (t.palm && t.raw && t.raw !== last) { buf.push(t.raw); last = t.raw; }
+    await sleep(40);
+  }
+  const med = k => buf.map(b => b[k]).sort((a, b) => a - b)[buf.length >> 1];
+  return {x: med('x'), y: med('y'), z: med('z')};
+}
+async function fullCalibrate() {
+  if (role === 'duo') return say('Kalibrasi lengkap untuk satu pemain. Mode berdua memakai rentang bawaan.');
+  if (!role || calMsg || mouseCtl() || !poseStat.ready || screenNow === 'wait' || screenNow === 'menu') return;
+  if (screenNow === 'pause') go('main');
+  setPause(true);
+  const t = trackers[0], n = LANGKAH.length + 1;
+  await calibrate(); // posisi siap: netral roll, pitch, kepala
+  const netral = await holdRaw(t, `Kalibrasi 1/${n}: posisi siap.`), got = {};
+  for (const [i, [k, teks]] of LANGKAH.entries()) {
+    for (let s = 2; s > 0 && role; s--) { calMsg = `Kalibrasi ${i + 2}/${n}: ${teks}… ${s}`; await sleep(1000); }
+    got[k] = await holdRaw(t, `Kalibrasi ${i + 2}/${n}: ${teks}.`);
+  }
+  for (let s = 2; s > 0 && role; s--) { calMsg = 'Kembali ke posisi siap… ' + s; await sleep(1000); }
+  calMsg = '';
+  if (!role) return;
+  const R = calRange(netral, got), bad = ['x', 'y', 'z'].filter(k => !R[k]).map(k => ({x: 'kiri-kanan', y: 'atas-bawah', z: 'depan-belakang'})[k]);
+  t.range = R; localStorage.setItem(CALKEY, JSON.stringify({...calStore(), [t.hand]: R}));
+  say(bad.length ? 'Kalibrasi tersimpan. Gerak ' + bad.join(', ') + ' terlalu sempit: pakai bawaan.' : 'Kalibrasi lengkap tersimpan untuk tangan ' + (t.hand === 'L' ? 'kiri.' : 'kanan.'));
+  setPause(false);
+}
+function say(teks) { toastQ = toastQ.then(async () => { const e = $('toast'); e.textContent = teks; e.hidden = false; await sleep(3500); e.hidden = true; }); }
 function setPause(v) { if (role === 'guest') send({t: 'pause', v}, 3); else S.paused = v; }
 async function recalibrate() {
   if (!role || calMsg || mouseCtl() || screenNow === 'wait' || screenNow === 'menu') return;
@@ -253,7 +294,7 @@ function again() {
 function nextKarier() { if (karierIdx === null || karierIdx + 1 >= LAWAN.length) return; const i = karierIdx + 1; fail(''); startKarier(i); }
 const fullscreen = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
 $('pauseBtn').onclick = openPause; $('resume').onclick = resume; $('again').onclick = again; $('next').onclick = nextKarier;
-$('cal').onclick = $('cal2').onclick = recalibrate; $('hand').onchange = recalibrate; $('full').onclick = fullscreen;
+$('cal').onclick = $('cal2').onclick = recalibrate; $('calFull').onclick = fullCalibrate; $('hand').onchange = recalibrate; $('full').onclick = fullscreen;
 $('quit').onclick = $('quit2').onclick = $('cancel').onclick = () => fail('');
 $('sound').onchange = () => snd.setSound($('sound').checked);
 $('spd').onchange = () => { if (role && role !== 'guest') S.ts = +$('spd').value; };
@@ -266,6 +307,7 @@ addEventListener('keydown', e => {
   if (k === ' ') { e.preventDefault(); if (replay) replay = null; else if (screenNow === 'result') again(); else resume(); }
   else if (k === 'p') screenNow === 'pause' ? resume() : openPause();
   else if (k === 'k') recalibrate();
+  else if (k === 'l') fullCalibrate();
   else if (k === 'f') fullscreen();
 });
 

@@ -1,6 +1,6 @@
 // Kamera + MediaPipe Pose -> posisi dan sudut bat per pemain.
 import {PoseLandmarker, FilesetResolver} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/+esm";
-import {clamp, palmPitch} from './physics.js';
+import {clamp, palmPitch, seg} from './physics.js';
 
 const WASM = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
 const MODEL = acc => `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_${acc}/float16/1/pose_landmarker_${acc}.task`;
@@ -33,6 +33,7 @@ export class Tracker {
     this.hand = 'R'; this.pick = false; this.palm = null; this.lastSeen = 0;
     this.zBase = 0; this.rBase = 0; this.pBase = 0; this.rawP = 0; this.calBuf = null;
     this.hf = {x: new OneEuro(2), y: new OneEuro(2)}; this.hBase = null; this.headRaw = null;
+    this.range = null; this.raw = null; // rentang dari kalibrasi lengkap; nilai mentah terakhir untuk mengisinya
     this.head = {x: 0, y: 0}; // geseran kepala dari posisi kalibrasi, meter: x ke kanan pemain, y ke atas
   }
   // Kepala: rata-rata hidung, mata, telinga. Lebar bahu (~0,38 m) jadi penggaris, jadi tidak bergantung jarak ke kamera.
@@ -86,7 +87,10 @@ export class Tracker {
     this.rawP = palmPitch(wl[ids[0]], wl[ids[2]], wl[ids[1]]);
     if (this.calBuf) this.calBuf.push({z: zRaw, r: rawR, p: this.rawP, ...(this.headRaw ? {hx: this.headRaw.x, hy: this.headRaw.y, sw: this.headRaw.sw} : {})});
     const mc = 3 * Math.pow(.1, o.smooth); // 0 -> 3 Hz (responsif), 1 -> 0.3 Hz (halus)
-    const raw = {x: clamp((sx - o.a) / (o.b - o.a)) * 2 - 1, y: 1 - clamp((sy - .15) / .7), z: clamp(.5 + (this.zBase - zRaw) * 1.7), // 1,7 / m: jangkauan lengan sekitar +-0,3 m
+    this.raw = {x: sx, y: sy, z: zRaw};
+    const R = o.solo && this.range || {}; // duel satu kamera: tiap orang separuh gambar, pakai rentang bawaan
+    const raw = {x: R.x ? seg(sx, R.x) * 2 - 1 : clamp((sx - o.a) / (o.b - o.a)) * 2 - 1, y: R.y ? 1 - seg(sy, R.y) : 1 - clamp((sy - .15) / .7),
+      z: R.z ? 1 - seg(zRaw, R.z) : clamp(.5 + (this.zBase - zRaw) * 1.7), // 1,7 / m: jangkauan lengan sekitar +-0,3 m
       r: clamp(dz(wrap(rawR - this.rBase), .06), -1, 1), p: !o.pitch ? 0 : clamp(dz(this.rawP - this.pBase, .06) * .8, -.6, .6)}; // bat: roll dan pitch relatif terhadap netral
     for (const k in raw) this.fil[k] = this.filt[k].f(k in this.hist ? this.med3(k, raw[k]) : raw[k], now, mc * MINCUT_SCALE[k]);
   }
@@ -130,7 +134,7 @@ export function readPose(vid, trackers, o) {
   let res;
   try { res = landmarker.detectForVideo(vid, now); } catch (e) { fallback(e).catch(err => console.error('Pose CPU juga gagal', err)); return; }
   const took = performance.now() - now; skip = took > 40 ? 2 : took > 22 ? 1 : 0;
-  if (trackers.length === 1) return trackers[0].update(res.landmarks[0], res.worldLandmarks[0], now, {...o, a: .15, b: .85});
+  if (trackers.length === 1) return trackers[0].update(res.landmarks[0], res.worldLandmarks[0], now, {...o, a: .15, b: .85, solo: true});
   const ps = res.landmarks.map((lm, i) => ({lm, wl: res.worldLandmarks[i], sx: 1 - (lm[11].x + lm[12].x) / 2})).sort((p, q) => p.sx - q.sx);
   let L = null, R = null;
   if (ps.length >= 2) [L, R] = ps; else if (ps.length === 1) ps[0].sx < .5 ? L = ps[0] : R = ps[0];

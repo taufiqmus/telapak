@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {newState, nextServe, startRound, step, applyHit, tryHit, won, fly, backhand, palmPitch, launch, reach, TY, BR, HIT} from '../js/physics.js';
+import {newState, nextServe, startRound, step, applyHit, tryHit, won, fly, backhand, palmPitch, launch, reach, calRange, seg, TY, BR, HIT} from '../js/physics.js';
 
 const blocked = {swing: () => ({s: 1, vy: 0}), remote: () => true}; // tidak ada yang bisa memukul
 const run = (S, opt = blocked, max = 2000) => { for (let i = 0; i < max && S.ph === 'play'; i++) step(S, 1 / 120, opt); };
@@ -146,4 +146,16 @@ test('reach: kepala dan bat bergeser bersama = penilaian kena tidak berubah', ()
     const G = {...base, bx: -base.bx - ox, by: base.by + oy, bz: -base.bz, gx: -ox, gy: 1 + oy, gz: -base.hz, gex: ox, gey: oy}; // tamu: kanannya di -x
     assert.ok(Math.abs(reach(G, 'g').d - r0.d) < 1e-9);
   }
+});
+
+test('kalibrasi lengkap: rentang pribadi, netral di tengah, sumbu sempit ditolak', () => {
+  const n = {x: .55, y: .5, z: 0}, p = (x, y, z) => ({x, y, z});
+  const s = {kanan: p(.85, .5, 0), kiri: p(.2, .5, 0), atas: p(.55, .2, 0), bawah: p(.55, .75, 0), depan: p(.55, .5, -.25), belakang: p(.55, .5, .1)};
+  const R = calRange(n, s);
+  assert.equal(seg(n.x, R.x), .5); assert.equal(seg(n.z, R.z), .5);
+  assert.equal(seg(.55 + .3 * .85, R.x), 1); assert.equal(seg(.2, R.x), 0); // ujung yang dijangkau = penuh (sudah lewat batas 85%)
+  assert.ok(Math.abs(seg(.55 - .35 * .85 / 2, R.x) - .25) < 1e-9);
+  assert.equal(seg(-.25 * .85, R.z), 0); // depan = ujung bawah nilai mentah
+  const sempit = calRange(n, {...s, kanan: p(.57, .5, 0), belakang: p(.55, .5, .01)});
+  assert.equal(sempit.x, null); assert.equal(sempit.z, null); assert.ok(sempit.y);
 });
