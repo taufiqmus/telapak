@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {newState, nextServe, startRound, step, applyHit, tryHit, won, fly, backhand, TY, BR, HIT} from '../js/physics.js';
+import {newState, nextServe, startRound, step, applyHit, tryHit, won, fly, backhand, palmPitch, launch, TY, BR, HIT} from '../js/physics.js';
 
 const blocked = {swing: () => ({s: 1, vy: 0}), remote: () => true}; // tidak ada yang bisa memukul
 const run = (S, opt = blocked, max = 2000) => { for (let i = 0; i < max && S.ph === 'play'; i++) step(S, 1 / 120, opt); };
@@ -34,9 +34,9 @@ test('launch selalu melewati net dan mendarat di meja lawan', () => {
 });
 
 test('servis rendah tetap mendarat di meja lawan', () => {
-  for (const srv of ['h', 'g']) for (const vy of [-3, 0, 3]) {
+  for (const srv of ['h', 'g']) for (const vy of [-3, 0, 3]) for (const p of [-.6, 0, .6]) {
     const S = newState(); S.sl = srv === 'h' ? 0 : 2; nextServe(S); assert.equal(S.srv, srv);
-    S.t = 0; applyHit(S, srv, {x: 0, y: S.by, z: S.bz, r: 0, p: 0}, {s: 1, vy}); run(S);
+    S.t = 0; applyHit(S, srv, {x: 0, y: S.by, z: S.bz, r: 0, p}, {s: 1, vy}); run(S);
     assert.equal(S.why, 'miss'); assert.equal(S.pw, srv);
   }
 });
@@ -115,4 +115,24 @@ test('forehand/backhand menurut tangan, sisi, dan histeresis', () => {
   assert.equal(backhand('h', .3, 'L'), true); assert.equal(backhand('h', -.3, 'L'), false);
   assert.equal(backhand('g', .3, 'R'), true); assert.equal(backhand('g', -.3, 'R'), false); // tamu menghadap +z: kanannya di -x
   assert.equal(backhand('h', -.08, 'R', false), false); assert.equal(backhand('h', -.08, 'R', true), true); // di pita tengah: tetap seperti sebelumnya
+});
+
+test('palmPitch: condong jari ke kamera, tidak terpengaruh roll dan sisi telapak', () => {
+  const pt = (x, y, z) => ({x, y, z});
+  const W = pt(0, 0, 0), hand = (a, roll, back = false) => { // jari sepanjang 8 cm, condong a rad ke kamera, diputar roll di bidang gambar
+    const len = .08, up = len * Math.cos(a), toCam = len * Math.sin(a), sx = Math.sin(roll), sy = Math.cos(roll), w = back ? -.02 : .02;
+    const tip = (o) => pt(up * sx + o * sy, -(up * sy) + o * sx, -toCam);
+    return [tip(w), tip(-w)]; // telunjuk, kelingking (tukar sisi saat punggung tangan)
+  };
+  const at = (a, roll, back) => { const [i, k] = hand(a, roll, back); return palmPitch(W, i, k); };
+  assert.ok(Math.abs(at(0, 0)) < 1e-9);
+  assert.ok(Math.abs(at(.4, 0) - .4) < 1e-9);
+  assert.ok(at(-.4, 0) < 0);
+  assert.ok(Math.abs(at(.4, 1.05) - .4) < 1e-9);
+  assert.ok(Math.abs(at(.4, -1.05, true) - .4) < 1e-9);
+});
+
+test('bilah menutup menambah topspin, membuka menambah backspin', () => {
+  const spin = p => { const S = newState(); Object.assign(S, {ph: 'play', bx: 0, by: 1, bz: 1}); launch(S, 'h', {x: 0, y: 1, z: 1, r: 0, p}, {s: 1.5, vy: 0}); return S.w; };
+  assert.ok(spin(.6) > .3); assert.equal(spin(0), 0); assert.ok(spin(-.6) < -.3);
 });

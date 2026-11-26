@@ -1,6 +1,6 @@
 // Kamera + MediaPipe Pose -> posisi dan sudut bat per pemain.
 import {PoseLandmarker, FilesetResolver} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/+esm";
-import {clamp} from './physics.js';
+import {clamp, palmPitch} from './physics.js';
 
 const WASM = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
 const MODEL = acc => `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_${acc}/float16/1/pose_landmarker_${acc}.task`;
@@ -63,15 +63,12 @@ export class Tracker {
     const sx = 1 - c.x; // layar dicerminkan
     const mid = {x: (pts[2].x + pts[1].x) / 2, y: (pts[2].y + pts[1].y) / 2}; // tengah telunjuk-kelingking
     const rawR = Math.atan2(-(mid.x - pts[0].x), -(mid.y - pts[0].y) * .75); // .75 = 480/640 karena x dan y dinormalkan per sisi; 0 = jari menunjuk ke atas
-    // pitch dari lengan bawah (siku -> pergelangan): garis lebih panjang dan lebih stabil daripada titik telapak.
-    // lengan bergerak ke arah kamera (z pergelangan < z siku) = bilah condong ke depan (menutup)
-    const ei = ids[0] === 15 ? 13 : 14, el = wl[ei], wr = wl[ids[0]];
-    const hasElbow = lm[ei].visibility > .4;
-    if (hasElbow) this.rawP = Math.atan2(el.z - wr.z, Math.hypot(wr.x - el.x, wr.y - el.y));
+    // pitch dari telapak sendiri, bukan lengan bawah: menjangkau ke depan tidak lagi terbaca sebagai bilah menutup, dan siku boleh di luar gambar
+    this.rawP = palmPitch(wl[ids[0]], wl[ids[2]], wl[ids[1]]);
     if (this.calBuf) this.calBuf.push({z: zRaw, r: rawR, p: this.rawP});
     const mc = 3 * Math.pow(.1, o.smooth); // 0 -> 3 Hz (responsif), 1 -> 0.3 Hz (halus)
     const raw = {x: clamp((sx - o.a) / (o.b - o.a)) * 2 - 1, y: 1 - clamp((c.y - .15) / .7), z: clamp(.5 + (this.zBase - zRaw) * 1.7), // 1,7 / m: jangkauan lengan sekitar +-0,3 m
-      r: clamp(dz(wrap(rawR - this.rBase), .06), -1, 1), p: !o.pitch ? 0 : hasElbow ? clamp(dz(this.rawP - this.pBase, .06) * .8, -.6, .6) : this.fil.p}; // bat: roll dan pitch relatif terhadap netral
+      r: clamp(dz(wrap(rawR - this.rBase), .06), -1, 1), p: !o.pitch ? 0 : clamp(dz(this.rawP - this.pBase, .06) * .8, -.6, .6)}; // bat: roll dan pitch relatif terhadap netral
     for (const k in raw) this.fil[k] = this.filt[k].f(k in this.hist ? this.med3(k, raw[k]) : raw[k], now, mc * MINCUT_SCALE[k]);
   }
 }

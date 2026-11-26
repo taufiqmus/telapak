@@ -22,6 +22,13 @@ export function newState() {
 }
 
 export const batOf = (S, p) => p === 'h' ? {x: S.hx, y: S.hy, z: S.hz, r: S.hr, p: S.hp} : {x: S.gx, y: S.gy, z: S.gz, r: S.gr, p: S.gp};
+// Pitch bilah dari telapak sendiri (world landmarks MediaPipe: meter, y ke bawah, z menjauhi kamera):
+// sudut jari (tengah telunjuk-kelingking) condong ke kamera = ke net. + = menutup.
+// Tidak berubah oleh roll atau oleh sisi telapak yang menghadap kamera, dan tidak ikut berubah saat lengan menjangkau ke depan.
+export function palmPitch(wr, ix, pk) {
+  const mx = (ix.x + pk.x) / 2 - wr.x, my = (ix.y + pk.y) / 2 - wr.y, mz = (ix.z + pk.z) / 2 - wr.z;
+  return Math.atan2(-mz, Math.hypot(mx, my));
+}
 // Backhand: bat di sisi badan yang berlawanan dengan tangan pemukul, dilihat dari pemain itu sendiri.
 // prev = hasil frame sebelumnya; ambang ganda (histeresis) supaya bat tidak berkedip saat di tengah badan.
 export function backhand(side, x, hand, prev = false) {
@@ -48,7 +55,7 @@ export function startRound(S, win, ts) {
 export function launch(S, side, bat, swing) {
   const dir = side === 'h' ? -1 : 1, s = clamp(swing.s / 3), pn = clamp((bat.p || 0) / .6, -1, 1);
   const smash = S.ph === 'play' && swing.s >= SMASH_SPEED && S.by > NET_TOP + .12;
-  const w = smash ? .3 : clamp((swing.vy || 0) / 2.5, -1, 1) * (S.ph === 'serve' ? .5 : 1); // ayun ke atas = topspin
+  const w = smash ? .3 : clamp(clamp((swing.vy || 0) / 2.5, -1, 1) + .35 * pn, -1, 1) * (S.ph === 'serve' ? .5 : 1); // ayun ke atas atau bilah menutup = topspin; bilah membuka = backspin
   const zt = dir * (smash ? 1.15 : clamp(.45 + .7 * s - .15 * pn, .3, 1.25)); // bilah menutup = lebih pendek dan datar, membuka = lob lebih dalam
   const xt = clamp(.5 * bat.x + .35 * clamp(bat.r / 1.05, -1, 1) - (S.bx - bat.x) * 1.5, -.62, .62);
   const g = grav(w);

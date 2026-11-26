@@ -368,7 +368,7 @@ function hud() {
     const win = S.pw === me;
     snd.sPoint(win || duo); if (S.rally >= 6) { snd.sCrowd(S.rally >= 12); view.cheer(1.5); }
     if (!duo) {
-      if (S.miss && S.miss.side === me && S.miss.d <= 5) store.logShot({hit: 0, d: +S.miss.d.toFixed(3), dx: +S.miss.dx.toFixed(3), dy: +S.miss.dy.toFixed(3), bh: +backhand(me, batOf(S, me).x, myHand())});
+      if (S.miss && S.miss.side === me && S.miss.d <= 5) store.logShot({hit: 0, d: +S.miss.d.toFixed(3), dx: +S.miss.dx.toFixed(3), dy: +S.miss.dy.toFixed(3), bh: +backhand(me, batOf(S, me).x, myHand()), p: +batOf(S, me).p.toFixed(2)});
       progress(lat ? (win ? {latihan: 1, reli: S.rally} : {reli: S.rally}) : {reli: S.rally});
     }
   }
@@ -435,7 +435,7 @@ function tick(now) {
       swing: side => cpu && side === 'g' ? cpu.swing(S) : {...sp[side]},
       remote: side => role === 'host' && side === 'g',
       onHit: (side, r, smash) => {
-        if (side === ownSide() || duo) { if (!duo) { onMyHit(S, smash); store.logShot({hit: 1, d: +r.d.toFixed(3), along: +r.along.toFixed(3), bh: +backhand(side, batOf(S, side).x, myHand())}); } if (side === 'h') tutHit(); }
+        if (side === ownSide() || duo) { if (!duo) { onMyHit(S, smash); store.logShot({hit: 1, d: +r.d.toFixed(3), along: +r.along.toFixed(3), bh: +backhand(side, batOf(S, side).x, myHand()), p: +batOf(S, side).p.toFixed(2)}); } if (side === 'h') tutHit(); }
       }
     });
     if (S.hits !== hits) hitstop = reduced.matches || net() ? 0 : S.smashes > fx.smashes ? .12 : .045; // duel: tanpa hitstop, prediksi bola tamu tidak mengenalnya
