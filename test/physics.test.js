@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {newState, nextServe, startRound, step, applyHit, tryHit, won, fly, TY, BR, HIT} from '../js/physics.js';
+import {newState, nextServe, startRound, step, applyHit, tryHit, won, fly, backhand, TY, BR, HIT} from '../js/physics.js';
 
 const blocked = {swing: () => ({s: 1, vy: 0}), remote: () => true}; // tidak ada yang bisa memukul
 const run = (S, opt = blocked, max = 2000) => { for (let i = 0; i < max && S.ph === 'play'; i++) step(S, 1 / 120, opt); };
@@ -108,4 +108,11 @@ test('sisi jarak jauh tidak dipukul lokal, tapi near-miss-nya tetap dicatat', ()
   assert.ok(S.near.g && S.near.g.d > 0);
   S.gx = 0; assert.equal(tryHit(S, 'g', {swing: () => ({s: 1, vy: 0}), remote: s => s === 'g'}), false);
   assert.equal(S.hits, 0);
+});
+
+test('forehand/backhand menurut tangan, sisi, dan histeresis', () => {
+  assert.equal(backhand('h', .3, 'R'), false); assert.equal(backhand('h', -.3, 'R'), true);
+  assert.equal(backhand('h', .3, 'L'), true); assert.equal(backhand('h', -.3, 'L'), false);
+  assert.equal(backhand('g', .3, 'R'), true); assert.equal(backhand('g', -.3, 'R'), false); // tamu menghadap +z: kanannya di -x
+  assert.equal(backhand('h', -.08, 'R', false), false); assert.equal(backhand('h', -.08, 'R', true), true); // di pita tengah: tetap seperti sebelumnya
 });

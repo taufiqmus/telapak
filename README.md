@@ -18,6 +18,7 @@ Main langsung: https://taufiqmus.github.io/telapak/
 ## Teknik pukulan
 
 - **Arah**: posisi bat dan kemiringan telapak menentukan arah bola.
+- **Forehand dan backhand**: bat di sisi tangan pemukul = forehand (karet merah ke net), bat menyilang ke sisi lain = backhand (karet hitam ke net, lengan menyilang badan). Pilihan "Tangan" di pengaturan menentukan sisi pemukul. `telapakLog()` mencatat `bh` per pukulan untuk menyetel backhand.
 - **Kekuatan**: kecepatan ayun. Ayunan cepat = bola lebih dalam.
 - **Spin**: ayun ke atas saat memukul = topspin (bola menukik, pantulan melesat, jejak merah). Ayun ke bawah = backspin (jejak biru).
 - **Smash**: ayunan sangat cepat (di atas 3,2 m/s) ke bola yang tinggi.

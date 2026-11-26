@@ -1,6 +1,6 @@
 // Tampilan 3D: ruangan, meja, bola, bat, karakter, efek. Tidak tahu apa-apa soal aturan permainan.
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
-import {TL, TW, TY, NET_TOP, BR, EYE_Y, EYE_Z, LOOK_Y, LOOK_Z, FOV, clamp} from './physics.js';
+import {TL, TW, TY, NET_TOP, BR, EYE_Y, EYE_Z, LOOK_Y, LOOK_Z, FOV, clamp, backhand} from './physics.js';
 
 export const COLOR = {h: 0x2f7de1, g: 0xdc2626};
 
@@ -71,7 +71,7 @@ export function createScene(cv) {
     const blade = new THREE.Mesh(new THREE.CylinderGeometry(.15, .15, .018, 28), [mat(0x3a2a1a), mat(0xdc2626), mat(0x111111)]);
     blade.rotation.x = Math.PI / 2; g.add(blade); // pusat bilah = pusat telapak, jadi derau sudut tidak menggeser bilah
     const h = new THREE.Mesh(new THREE.BoxGeometry(.035, .13, .02), mat(0xd6a76a)); h.position.y = -.2; g.add(h);
-    scene.add(g); return g;
+    g.userData.blade = blade; scene.add(g); return g;
   }
   const bats = {h: makeBat(), g: makeBat()};
 
@@ -83,9 +83,9 @@ export function createScene(cv) {
     part(new THREE.BoxGeometry(.4, .55, .22), shirt, 0, 1.08);
     part(new THREE.SphereGeometry(.12, 16, 12), skin, 0, 1.5);
     part(new THREE.BoxGeometry(.26, .05, .26), 0xffffff, 0, 1.6); // ikat kepala
-    part(new THREE.BoxGeometry(.08, .5, .08), skin, -.25, 1.1);
+    const idle = part(new THREE.BoxGeometry(.08, .5, .08), skin, -.25, 1.1); // lengan bebas, digeser ke sisi non-pemukul tiap frame
     const arm = new THREE.Mesh(new THREE.CylinderGeometry(.04, .04, 1, 8), mat(skin)); scene.add(arm);
-    scene.add(g); return {g, arm};
+    scene.add(g); return {g, arm, idle};
   }
   const chars = {h: makeChar(COLOR.h), g: makeChar(COLOR.g)};
   chars.h.g.rotation.y = Math.PI; // menghadap meja
@@ -101,6 +101,7 @@ export function createScene(cv) {
   const grip = b => new THREE.Vector3(b.x - .25 * Math.sin(b.r), b.y - .25 * Math.cos(b.r) * Math.cos(b.p), b.z + .25 * Math.cos(b.r) * Math.sin(b.p)); // ujung gagang
 
   let shake = 0, cheer = 0;
+  const bh = {h: false, g: false}; // forehand/backhand per sisi; disimpan di sini supaya tayangan ulang juga benar
   const api = {
     burst(p, color, n = 16, speed = 1.6) {
       let k = 0;
@@ -118,7 +119,11 @@ export function createScene(cv) {
     draw(F) {
       const {D, dt} = F, W = cv.clientWidth, H = cv.clientHeight, sz = renderer.getSize(new THREE.Vector2());
       if (sz.x !== W || sz.y !== H) renderer.setSize(W, H, false);
-      for (const k of ['h', 'g']) { const b = F.bats[k], m = bats[k]; m.position.set(b.x, b.y, b.z); m.rotation.z = -b.r; m.rotation.x = -b.p; }
+      for (const k of ['h', 'g']) {
+        const b = F.bats[k], m = bats[k]; m.position.set(b.x, b.y, b.z); m.rotation.z = -b.r; m.rotation.x = -b.p;
+        bh[k] = backhand(k, b.x, F.hands[k], bh[k]);
+        m.userData.blade.rotation.x = (k === 'g') !== bh[k] ? Math.PI / 2 : -Math.PI / 2; // karet merah ke net saat forehand, hitam saat backhand
+      }
 
       const live = D.ph === 'serve' || D.ph === 'play';
       ball.visible = live; ball.position.set(D.bx, D.by, D.bz);
@@ -147,7 +152,9 @@ export function createScene(cv) {
       for (const k of ['h', 'g']) {
         const s = k === 'h' ? 1 : -1, b = F.bats[k], c = chars[k], ow = new THREE.Vector3(b.x * .3, 0, s * (TL / 2 + 1));
         c.g.position.copy(ow);
-        setArm(c.arm, new THREE.Vector3(ow.x - s * .26, 1.3, ow.z), grip(b));
+        const hs = F.hands[k] === 'L' ? -1 : 1; // lengan pemukul dari bahu tangan pemukul; backhand = lengan menyilang badan
+        c.idle.position.x = hs * .25;
+        setArm(c.arm, new THREE.Vector3(ow.x + s * hs * .26, 1.3, ow.z), grip(b));
         setArm(fpArm[k], new THREE.Vector3(s * (F.hands[k] === 'R' ? .3 : -.3), 1.15, s * (EYE_Z - .05)), grip(b));
       }
 

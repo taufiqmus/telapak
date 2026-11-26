@@ -1,5 +1,5 @@
 // Perekat: layar menu, mode permainan, input, loop utama, duel jaringan.
-import {newState, startRound, step, tryHit, applyHit, canHit, batOf, fly, handToBat, ndcToHand, clamp, NET_TOP, PROTO} from './physics.js';
+import {newState, startRound, step, tryHit, applyHit, canHit, batOf, fly, handToBat, ndcToHand, clamp, backhand, NET_TOP, PROTO} from './physics.js';
 import {Tracker, loadPose, readPose, setPeople, poseStat} from './pose.js';
 import {Cpu, LAWAN, quick, MESIN} from './cpu.js';
 import {createScene, COLOR} from './scene.js';
@@ -35,6 +35,7 @@ let tut = null;
 
 const ownSide = () => role === 'guest' ? 'g' : 'h';
 const net = () => role === 'host' || role === 'guest';
+const myHand = () => mouseCtl() ? ($('hand').value === 'L' ? 'L' : 'R') : trackers[0].hand; // tangan pemukul pemain laptop ini
 const mouseCtl = () => $('ctrl').value === 'mouse' && role !== 'duo';
 const status = t => $('st').textContent = t;
 const myName = d => $('name').value.trim() || d;
@@ -144,7 +145,7 @@ function bindConn(c) {
     rxT = performance.now();
     if (d.t === 'p' && role === 'host') {
       if (d.n <= rxN) return; rxN = d.n; // paket bisa datang tidak berurutan
-      S.gx = clamp(d.x, -2, 2); S.gy = clamp(d.y, .2, 2); S.gz = clamp(d.z, -1.9, -1); S.gr = clamp(d.r, -1.3, 1.3); S.gp = clamp(d.p, -1.2, 1.2);
+      S.gx = clamp(d.x, -2, 2); S.gy = clamp(d.y, .2, 2); S.gz = clamp(d.z, -1.9, -1); S.gr = clamp(d.r, -1.3, 1.3); S.gp = clamp(d.p, -1.2, 1.2); S.gh = d.h === 'L' ? 'L' : 'R';
     } else if (d.t === 's' && role === 'guest') {
       if (d.n > rxN) { rxN = d.n; Object.assign(S, d.s); guestSync(); }
     } else if (d.t === 'hit' && role === 'host') hostHit(d);
@@ -368,7 +369,7 @@ function hud() {
     const win = S.pw === me;
     snd.sPoint(win || duo); if (S.rally >= 6) { snd.sCrowd(S.rally >= 12); view.cheer(1.5); }
     if (!duo) {
-      if (S.miss && S.miss.side === me && S.miss.d <= 5) store.logShot({hit: 0, d: +S.miss.d.toFixed(3), dx: +S.miss.dx.toFixed(3), dy: +S.miss.dy.toFixed(3)});
+      if (S.miss && S.miss.side === me && S.miss.d <= 5) store.logShot({hit: 0, d: +S.miss.d.toFixed(3), dx: +S.miss.dx.toFixed(3), dy: +S.miss.dy.toFixed(3), bh: +backhand(me, batOf(S, me).x, myHand())});
       progress(lat ? (win ? {latihan: 1, reli: S.rally} : {reli: S.rally}) : {reli: S.rally});
     }
   }
@@ -423,6 +424,7 @@ function tick(now) {
   const local = role === 'cpu' || role === 'duo' || (role === 'host' && conn);
   if (local && !S.paused && !stale && !calMsg && !replay) {
     for (const side in own) setBat(side, own[side]);
+    if (duo) { S.hh = trackers[0].hand; S.gh = trackers[1].hand; } else S.hh = myHand(); // komputer: tangan kanan dari newState
     if (cpu) cpu.think(S, dt);
     if (tut) tutTick(dt, own.h); // sebelum measureSwing: tutTick membaca posisi bat frame sebelumnya
     measureSwing(dt);
@@ -433,7 +435,7 @@ function tick(now) {
       swing: side => cpu && side === 'g' ? cpu.swing(S) : {...sp[side]},
       remote: side => role === 'host' && side === 'g',
       onHit: (side, r, smash) => {
-        if (side === ownSide() || duo) { if (!duo) { onMyHit(S, smash); store.logShot({hit: 1, d: +r.d.toFixed(3), along: +r.along.toFixed(3)}); } if (side === 'h') tutHit(); }
+        if (side === ownSide() || duo) { if (!duo) { onMyHit(S, smash); store.logShot({hit: 1, d: +r.d.toFixed(3), along: +r.along.toFixed(3), bh: +backhand(side, batOf(S, side).x, myHand())}); } if (side === 'h') tutHit(); }
       }
     });
     if (S.hits !== hits) hitstop = reduced.matches || net() ? 0 : S.smashes > fx.smashes ? .12 : .045; // duel: tanpa hitstop, prediksi bola tamu tidak mengenalnya
@@ -448,7 +450,7 @@ function tick(now) {
   } else if (role === 'guest' && conn && conn.open) {
     measureSwingGuest(own.g, dt);
     guestTick(dt, own.g);
-    send({t: 'p', n: ++txN, ...own.g});
+    send({t: 'p', n: ++txN, ...own.g, h: myHand()});
     if (now - lastPose > 1000) { lastPose = now; send({t: 'ping', c: now}); }
   }
   if (role === 'host' && conn && conn.open) send({t: 's', n: ++txN, s: S});
@@ -467,7 +469,7 @@ function tick(now) {
     for (const side in own) bats[side] = own[side]; // bat sendiri selalu dari input lokal, tanpa menunggu jaringan
   }
   const views = replay ? [{side: 'tv', x: 0, y: 0, w: 1, h: 1}] : duo ? [{side: 'h', x: 0, y: 0, w: .5, h: 1}, {side: 'g', x: .5, y: 0, w: .5, h: 1}] : [{side: ownSide(), x: 0, y: 0, w: 1, h: 1}];
-  view.draw({D, bats, views, hands: {h: trackers[0].hand, g: duo ? trackers[1].hand : trackers[0].hand}, inGame: !!role && screenNow !== 'wait', dt, reduced: reduced.matches});
+  view.draw({D, bats, views, hands: duo ? {h: S.hh, g: S.gh} : {h: S.hh, g: S.gh, [ownSide()]: myHand()}, inGame: !!role && screenNow !== 'wait', dt, reduced: reduced.matches});
   hud();
   drawPip();
 

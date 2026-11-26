@@ -4,7 +4,7 @@ export const TL = 2.74, TW = 1.525, TY = .76, NET_TOP = TY + .1525, BR = .05, G 
 export const EYE_Y = 1.55, EYE_Z = 2.6, LOOK_Y = .85, LOOK_Z = -.3, FOV = 65; // kamera pemain, diam; dipakai juga oleh pemetaan tangan
 export const SPIN_G = 5; // percepatan tegak tambahan per satuan spin: topspin (+1) menukik, backspin (-1) melayang
 export const SMASH_SPEED = 3.2; // m/s ayunan bat; di atas ini bola tinggi dipukul smash
-export const PROTO = 2; // versi protokol duel; naikkan bila isi paket berubah
+export const PROTO = 3; // versi protokol duel; naikkan bila isi paket berubah
 
 export const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 export const lerp = (a, b, t) => a + (b - a) * t;
@@ -17,11 +17,17 @@ export function newState() {
     bx: 0, by: 1.1, bz: 1.1, vx: 0, vy: 0, vz: 0, w: 0,
     sl: 0, sr: 0, ph: 'wait', t: 0, srv: 'h', last: null, bn: 0, pw: 'h', why: '', miss: null,
     win: 7, ts: 1, mode: 'match', paused: false, hits: 0, bounces: 0, smashes: 0, rally: 0, best: 0, dur: 0,
-    nh: '', ng: '', tx: 0, tz: 0, near: {h: null, g: null}
+    nh: '', ng: '', hh: 'R', gh: 'R', tx: 0, tz: 0, near: {h: null, g: null}
   };
 }
 
 export const batOf = (S, p) => p === 'h' ? {x: S.hx, y: S.hy, z: S.hz, r: S.hr, p: S.hp} : {x: S.gx, y: S.gy, z: S.gz, r: S.gr, p: S.gp};
+// Backhand: bat di sisi badan yang berlawanan dengan tangan pemukul, dilihat dari pemain itu sendiri.
+// prev = hasil frame sebelumnya; ambang ganda (histeresis) supaya bat tidak berkedip saat di tengah badan.
+export function backhand(side, x, hand, prev = false) {
+  const px = (side === 'h' ? 1 : -1) * (hand === 'L' ? -1 : 1) * x; // + = sisi tangan pemukul (m)
+  return prev ? px < .01 : px < -.11;
+}
 export const won = S => Math.max(S.sl, S.sr) >= S.win && Math.abs(S.sl - S.sr) >= 2; // selisih minimal 2
 
 export function nextServe(S) {
