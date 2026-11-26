@@ -33,7 +33,7 @@ export class Tracker {
     this.hand = 'R'; this.pick = false; this.palm = null; this.lastSeen = 0;
     this.zBase = 0; this.rBase = 0; this.pBase = 0; this.rawP = 0; this.calBuf = null;
     this.hf = {x: new OneEuro(2), y: new OneEuro(2)}; this.hBase = null; this.headRaw = null;
-    this.range = null; this.raw = null; // rentang dari kalibrasi lengkap; nilai mentah terakhir untuk mengisinya
+    this.range = null; this.raw = null; this.free = null; // rentang dari kalibrasi lengkap; nilai mentah terakhir untuk mengisinya
     this.head = {x: 0, y: 0}; // geseran kepala dari posisi kalibrasi, meter: x ke kanan pemain, y ke atas
   }
   // Kepala: rata-rata hidung, mata, telinga. Lebar bahu (~0,38 m) jadi penggaris, jadi tidak bergantung jarak ke kamera.
@@ -46,6 +46,17 @@ export class Tracker {
     if (!this.hBase) return;
     const k = .38 / this.hBase.sw;
     this.head = {x: this.hf.x.f(clamp((this.hBase.x - c.x) * k, -.45, .45), now, .8), y: this.hf.y.f(clamp((this.hBase.y - c.y) * .75 * k, -.35, .25), now, .8)};
+  }
+  // Tangan bebas (pelempar bola servis): titik tengah telapak dalam satuan tangan yang sama dengan bat (x -1..1, y 0..1),
+  // tanpa filter berat dan tanpa batas atas supaya gerak melempar ke atas tetap terbaca cepat. free.t = waktu terakhir terlihat.
+  readFree(lm, ids, now, o) {
+    const pts = ids.map(i => lm[i]);
+    if (ids.reduce((t, i) => t + lm[i].visibility, 0) / 4 < .5 || pts.some(p => p.x < .03 || p.x > .97 || p.y < .03 || p.y > .97)) return;
+    const c = {x: pts.reduce((t, p) => t + p.x, 0) / 4, y: pts.reduce((t, p) => t + p.y, 0) / 4};
+    const hs = o.head && this.hBase ? .38 / this.hBase.sw : 0;
+    const sx = 1 - c.x - (hs ? this.head.x / hs : 0), sy = c.y + (hs ? this.head.y / (.75 * hs) : 0);
+    const f = {x: clamp((sx - o.a) / (o.b - o.a)) * 2 - 1, y: 1 - (sy - .15) / .7, t: now};
+    this.free = this.free && now - this.free.t < 100 ? {x: this.free.x + (f.x - this.free.x) * .6, y: this.free.y + (f.y - this.free.y) * .6, t: now} : f;
   }
   med3(k, v) { const h = this.hist[k]; h.push(v); if (h.length > 3) h.shift(); return h.length < 3 ? v : [...h].sort((a, b) => a - b)[1]; }
   lost(now) { if (now - this.lastSeen > 200) this.palm = null; } // tahan 200 ms saat deteksi putus
@@ -69,6 +80,7 @@ export class Tracker {
     if (o.hand !== 'auto') this.hand = o.hand;
     else if (this.pick && Math.abs(lm[15].y - lm[16].y) > .05) this.hand = lm[15].y < lm[16].y ? 'L' : 'R'; // hanya saat kalibrasi: tangan yang lebih tinggi
     const ids = PALM[this.hand]; // tangan dikunci: memilih ulang tiap frame membuat bat melompat antar tangan
+    this.readFree(lm, PALM[this.hand === 'R' ? 'L' : 'R'], now, o);
     if (vis(ids) < 0.5) return this.lost(now);
     const pts = ids.map(i => lm[i]);
     // model tetap menebak tangan di luar gambar dengan visibility tinggi; batas tepi ini menangkap sebagian saja

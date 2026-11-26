@@ -4,7 +4,7 @@ export const TL = 2.74, TW = 1.525, TY = .76, NET_TOP = TY + .1525, BR = .05, G 
 export const EYE_Y = 1.55, EYE_Z = 2.6, LOOK_Y = .85, LOOK_Z = -.3, FOV = 65; // kamera pemain, diam; dipakai juga oleh pemetaan tangan
 export const SPIN_G = 5; // percepatan tegak tambahan per satuan spin: topspin (+1) menukik, backspin (-1) melayang
 export const SMASH_SPEED = 3.2; // m/s ayunan bat; di atas ini bola tinggi dipukul smash
-export const PROTO = 5;
+export const PROTO = 6;
 export const SIDE_G = 2.5; // m/s² belokan bola per satuan sidespin
 export const TOSS_Y = .95, TOSS_V = 2.6, SERVE_Z = 1.45; // lemparan servis: dari tinggi tangan, naik sekitar 35 cm, di belakang garis ujung
 export const EDGE = .015; // m: mendarat sedekat ini ke tepi meja = bola tepi (sah, memantul rendah) // versi protokol duel; naikkan bila isi paket berubah
@@ -22,7 +22,7 @@ export function newState() {
     win: 7, ts: 1, mode: 'match', paused: false, hits: 0, bounces: 0, smashes: 0, rally: 0, best: 0, dur: 0,
     nh: '', ng: '', hh: 'R', gh: 'R', hex: 0, hey: 0, gex: 0, gey: 0,
     tx: 0, tz: 0, near: {h: null, g: null},
-    err: 0, errG: 0, ws: 0, cord: false, toss: false, sv: false, sb: 0, cords: 0, edges: 0, lets: 0, shot: '' // err: 0 = pukulan berbantuan penuh, 1 = realistis
+    err: 0, errG: 0, cause: '', ws: 0, cord: false, toss: false, hold: false, lowToss: false, sv: false, sb: 0, cords: 0, edges: 0, lets: 0, shot: '' // err: 0 = pukulan berbantuan penuh, 1 = realistis
   };
 }
 
@@ -59,7 +59,7 @@ export function nextServe(S) {
   const tot = S.sl + S.sr, deuce = Math.min(S.sl, S.sr) >= S.win - 1;
   S.srv = S.mode === 'latihan' ? 'g' : (deuce ? tot : tot >> 1) % 2 === 0 ? 'h' : 'g'; // ganti server tiap 2 poin, tiap poin saat deuce
   S.ph = 'serve'; S.t = S.mode === 'latihan' ? .9 : 1.5; S.last = null; S.bn = 0; S.rally = 0; S.w = 0; S.ws = 0; S.cord = false; S.shot = '';
-  S.toss = false; S.sv = false; S.sb = 0;
+  S.toss = false; S.hold = false; S.lowToss = false; S.sv = false; S.sb = 0;
   S.bx = 0; S.by = TOSS_Y; S.bz = S.srv === 'h' ? SERVE_Z : -SERVE_Z; S.vx = S.vy = S.vz = 0; // servis dari belakang garis ujung meja
   S.near = {h: null, g: null};
 }
@@ -67,6 +67,31 @@ export function nextServe(S) {
 export function startRound(S, win, ts) {
   S.sl = S.sr = 0; S.win = win; S.ts = ts; S.best = S.dur = 0; S.paused = false; S.miss = null; S.why = '';
   nextServe(S);
+}
+
+// Lemparan servis. hand = dilempar tangan pemain (bukan otomatis). Aturan: bola naik minimal 16 cm.
+// Lemparan tangan di bawah itu hanya salah di setelan realistis; di setelan lain kecepatannya dinaikkan agar tetap bisa dipukul.
+export const TOSS_MIN = .16;
+export function toss(S, vy, hand = false) {
+  const strict = (S.srv === 'h' ? S.err : S.errG) >= 1;
+  S.vy = hand ? clamp(vy, strict ? 1.2 : 1.9, 3.6) : vy;
+  S.toss = true; S.hold = false; S.lowToss = hand && S.vy * S.vy / (2 * G) < TOSS_MIN;
+}
+// Gerak melempar dari riwayat tinggi tangan bebas [{t (s), y (m)}], terbaru di akhir.
+// Lempar = tangan sempat diam (rentang < 6 cm selama 0,25 s) lalu naik cepat (> 0,9 m/s rata-rata dalam ~0,1 s).
+// Hasil: kecepatan lempar (m/s) atau 0. Hanya kecepatan naik yang dipakai, jadi tangan boleh keluar gambar sesudahnya.
+export function tossDetect(H) {
+  if (H.length < 4) return 0;
+  const now = H[H.length - 1], base = H.filter(p => now.t - p.t <= .12);
+  const a = base[0];
+  if (!a || now.t - a.t < .05) return 0;
+  const v = (now.y - a.y) / (now.t - a.t);
+  if (v < .9) return 0;
+  const still = H.filter(p => a.t - p.t > 0 && a.t - p.t <= .3);
+  if (still.length < 3 || a.t - still[0].t < .2) return 0;
+  const ys = still.map(p => p.y);
+  if (Math.max(...ys) - Math.min(...ys) > .06) return 0;
+  return v * 1.4; // bola lepas lebih cepat dari rata-rata gerak tangan
 }
 
 // Pukulan berbantuan: cari waktu terbang t agar bola mendarat di titik target meja lawan dan melewati net.
@@ -110,8 +135,12 @@ export function launch(S, side, bat, swing, q) {
   const w = shot === 'smash' ? .3 : shot === 'lob' ? .1 : shot === 'drop' ? -.9
     : clamp(clamp((swing.vy || 0) / 2.5, -1, 1) + .35 * pn, -1, 1) * (S.ph === 'serve' ? .5 : 1); // ayun ke atas atau bilah menutup = topspin; bilah membuka = backspin
   const ws = clamp((swing.vx || 0) / 3, -1, 1) * (S.ph === 'serve' ? .3 : .6); // ayunan menyamping = sidespin: bola membelok ke arah ayunan
-  const zt = dir * (shot === 'smash' ? 1.15 : shot === 'lob' ? 1.05 : shot === 'drop' ? .32 : clamp(.45 + .7 * s - .15 * pn, .3, 1.25)); // bilah menutup = lebih pendek dan datar, membuka = lebih dalam
-  const xt = clamp(.5 * bat.x + .35 * clamp(bat.r / 1.05, -1, 1) - (S.bx - bat.x) * 1.5, -.62, .62);
+  // e > 0: ayunan sangat keras dan arah ekstrem boleh melewati garis meja (bantuan penuh menjaga semuanya di dalam)
+  const e = side === 'h' ? S.err : S.errG, wIn = S.ph === 'play' ? S.w : 0, sr = swing.s / 3;
+  const depth = .45 + .7 * Math.min(sr, 1) + .5 * clamp(sr - 1, 0, .8 * e) - .15 * pn;
+  const zt = dir * (shot === 'smash' ? 1.15 : shot === 'lob' ? 1.05 : shot === 'drop' ? .32 : clamp(depth, .3, 1.25 + .5 * e)); // bilah menutup = lebih pendek dan datar, membuka = lebih dalam
+  const aim = .5 * bat.x + .35 * clamp(bat.r / 1.05, -1, 1) - (S.bx - bat.x) * 1.5;
+  const xt = clamp(aim, -.62 - .3 * e, .62 + .3 * e);
   const g = grav(w), ax = SIDE_G * ws;
   let t = shot === 'smash' ? .28 : shot === 'lob' ? 1.15 : shot === 'drop' ? .7 : (S.ph === 'serve' ? .42 : .6 - .25 * s) * (1 - .3 * pn), vx, vy, vz; // servis: lintasan rendah
   const z2 = dir * clamp(.5 + .65 * s - .15 * pn, .4, 1.2), sv = S.ph === 'serve' && (serveSolve(S, side, w, ws, xt, z2) || serveSolve(S, side, w, ws, xt * .4, z2) || serveSolve(S, side, w, 0, 0, z2)); // sudut tak terjangkau: geser ke tengah, lalu buang sidespin
@@ -121,18 +150,27 @@ export function launch(S, side, bat, swing, q) {
     const tn = -S.bz / vz;
     if (tn > 0 && S.by + vy * tn - .5 * g * tn * tn > NET_TOP + BR + .04) break;
   }
-  // Galat pukulan: ditentukan kualitas kontak, bukan acak, jadi bisa dipelajari dan sama di kedua laptop duel.
+  // Galat pukulan: ditentukan kualitas kontak dan spin yang datang, bukan acak, jadi bisa dipelajari dan sama di kedua laptop duel.
   // Bola di bawah tengah bat (bat menutup bola) = rendah, ke net. Bola di atas = melambung, panjang. Di samping = melebar.
-  // Ayunan keras pada bola yang tidak tinggi: bilah menutup = net, membuka = panjang.
+  // Ayunan keras memperbesar kontak yang buruk. Ayunan keras pada bola yang tidak tinggi: bilah menutup = net, membuka = panjang.
+  // Spin yang datang: topspin yang tidak dilawan memantul naik dan panjang, backspin turun ke net. Dilawan dengan bilah
+  // (menutup untuk topspin, membuka untuk backspin) atau arah ayunan (ke atas mengangkat backspin, datar/turun meredam topspin).
   // Timing tidak dipakai: pukulan terjadi otomatis di frame pertama bola terjangkau, jadi 'along' hampir selalu sama.
-  const e = side === 'h' ? S.err : S.errG;
+  let cause = Math.abs(aim) > .7 && e ? 'sudut' : depth > 1.32 && e && !shot ? 'keras' : '';
   if (e && q && shot !== 'drop') {
     const sweet = .4 * HIT, off = v => Math.sign(v) * Math.max(0, Math.abs(v) - sweet) / (HIT - sweet); // 0 di sweet spot, +-1 di tepi bat
-    const ox = clamp(off(q.dx), -1, 1), oy = clamp(off(q.dy), -1, 1);
-    let dvy = 1.3 * oy, kz = 1 + .12 * oy;
-    if (swing.s >= SMASH_SPEED && !smash) { dvy += pn > .2 || pn < -.2 ? -.9 * pn : 0; kz += .06 + (pn < -.2 ? -.1 * pn : 0); }
-    vy += e * dvy; vz *= 1 + e * (kz - 1); vx += e * 2 * ox * ps;
+    const ox = clamp(off(q.dx), -1, 1), oy = clamp(off(q.dy), -1, 1), pw = .6 + .4 * Math.min(sr, 2);
+    const cnt = .8 * pn - .8 * clamp((swing.vy || 0) / 2.5, -1, 1); // + melawan topspin, - melawan backspin
+    const mis = Math.sign(wIn) * Math.max(0, Math.abs(wIn) - Math.max(0, Math.sign(wIn) * cnt)); // sisa spin yang tidak dilawan
+    let dvy = 1.3 * oy * pw + 1.4 * mis, kz = 1 + .12 * oy * pw + .1 * mis;
+    const hard = swing.s >= SMASH_SPEED && !smash;
+    if (hard) { dvy += pn > .2 || pn < -.2 ? -.9 * pn : 0; kz += .06 + (pn < -.2 ? -.1 * pn : 0); }
+    vy += e * dvy; vz *= 1 + e * (kz - 1); vx += e * 2.6 * ox * pw * ps;
+    const parts = [[Math.abs(1.3 * oy * pw), oy < 0 ? 'atas' : 'bawah'], [Math.abs(1.5 * ox * pw), 'samping'], [Math.abs(1.4 * mis), mis > 0 ? 'topspin' : 'backspin'], [hard ? .9 : 0, 'keras']];
+    const big = parts.reduce((a, b) => b[0] > a[0] ? b : a, [.25, cause]);
+    cause = big[1];
   }
+  S.cause = cause;
   S.vx = vx; S.vy = vy; S.vz = vz; S.w = w; S.ws = sv ? sv.ws : ws; S.tx = xt; S.tz = sv ? z2 : zt; S.shot = shot;
   return smash;
 }
@@ -178,7 +216,7 @@ export function tryHit(S, side, opt) {
   return true;
 }
 
-// why: 'serve' (servis tidak memantul dulu di meja sendiri) | 'toss' (lemparan servis tidak terpukul) | 'net' (nyangkut net) | 'own' (memantul di meja sendiri) | 'out' (keluar panjang tanpa memantul) | 'wide' (keluar ke samping)
+// why: 'serve' (servis tidak memantul dulu di meja sendiri) | 'toss' (lemparan servis tidak terpukul) | 'lowtoss' (lemparan < 16 cm) | 'net' (nyangkut net) | 'own' (memantul di meja sendiri) | 'out' (keluar panjang tanpa memantul) | 'wide' (keluar ke samping)
 //      | 'miss' (penerima gagal mengembalikan) | 'let' (servis menyentuh net lalu masuk: diulang tanpa poin)
 export function endPoint(S, loser, why) {
   S.pw = other(loser);
@@ -243,8 +281,9 @@ export function step(S, dt, opt) {
   if (S.ph !== 'over') S.dur += dt;
   if (S.ph === 'serve') {
     S.t -= dt;
-    if (!S.toss) { if (S.t <= 0) { S.toss = true; S.vy = TOSS_V; } return; } // jeda dulu, lalu bola dilempar ke atas
-    const h = dt / S.ts; S.vy -= G * h; S.by += S.vy * h;
+    if (!S.toss) { if (S.t <= 0 && !S.hold) toss(S, TOSS_V); return; } // jeda dulu, lalu bola dilempar ke atas (atau menunggu tangan pemain)
+    const h = dt / S.ts, vy0 = S.vy; S.vy -= G * h; S.by += S.vy * h;
+    if (S.lowToss && vy0 >= 0 && S.vy < 0) return endPoint(S, S.srv, 'lowtoss'); // lemparan tangan terlalu rendah (realistis)
     if (S.vy < 0) tryHit(S, S.srv, opt);
     const far = opt.remote && opt.remote(S.srv); // servis tamu dinilai di laptop tamu: beri waktu pukulannya sampai, jangan beri poin
     if (S.ph === 'serve' && S.by < (far ? TY - .35 : TY + .02)) { // lemparan jatuh tanpa terpukul

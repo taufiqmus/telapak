@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {newState, nextServe, startRound, step, applyHit, tryHit, won, fly, backhand, palmPitch, launch, reach, calRange, seg, TY, BR, HIT, TW, NET_TOP} from '../js/physics.js';
+import {newState, nextServe, startRound, step, applyHit, tryHit, won, fly, backhand, palmPitch, launch, reach, calRange, seg, toss, tossDetect, TY, BR, HIT, TW, NET_TOP} from '../js/physics.js';
 
 const blocked = {swing: () => ({s: 1, vy: 0}), remote: () => true}; // tidak ada yang bisa memukul
 const run = (S, opt = blocked, max = 2000) => { for (let i = 0; i < max && S.ph === 'play'; i++) step(S, 1 / 120, opt); };
@@ -270,4 +270,57 @@ test('tanpa volley: bola belum memantul di meja sendiri tidak bisa dipukul', () 
   const S = newState(); Object.assign(S, {ph: 'play', bn: 0, bx: 0, by: 1, bz: 1.2, last: 'g', hx: 0, hy: 1, hz: 1.2});
   assert.equal(tryHit(S, 'h', {swing: () => ({s: 1, vy: 0})}), false);
   S.bn = 1; assert.equal(tryHit(S, 'h', {swing: () => ({s: 1, vy: 0})}), true);
+});
+
+// ---------- realisme: tingkat galat dan spin yang datang ----------
+test('tingkat galat: penuh 0%, normal sesekali, realistis 20-30% dengan keluar panjang terbanyak', () => {
+  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const gauss = () => Math.sqrt(-2 * Math.log(rnd() + 1e-12)) * Math.cos(2 * Math.PI * rnd());
+  const rate = err => {
+    seed = 7; const out = {};
+    for (let i = 0; i < 1500; i++) {
+      const S = newState(); Object.assign(S, {ph: 'play', rally: 3, bx: (rnd() - .5) * .8, by: .9 + rnd() * .35, bz: 1.1 + rnd() * .4, w: gauss() * .35, err});
+      const q = {dx: gauss() * .45 * HIT, dy: gauss() * .45 * HIT, along: -.2};
+      applyHit(S, 'h', {x: S.bx - q.dx, y: S.by - q.dy, z: 1.45, r: gauss() * .5, p: 0}, {s: Math.abs(1.6 + gauss() * 1.1), vy: gauss() * 1.2, vx: gauss()}, q);
+      for (let k = 0; k < 3000 && S.ph === 'play'; k++) step(S, 1 / 240, blocked);
+      out[S.why] = (out[S.why] || 0) + 1;
+    }
+    return {fail: 1 - (out.miss || 0) / 1500, out};
+  };
+  assert.equal(rate(0).fail, 0);
+  const n = rate(.6), r = rate(1);
+  assert.ok(n.fail > .05 && n.fail < .2, 'normal ' + n.fail);
+  assert.ok(r.fail > .2 && r.fail < .32, 'realistis ' + r.fail);
+  assert.ok(r.out.out > (r.out.net || 0) && r.out.out > (r.out.own || 0));
+});
+
+test('spin datang: dibiarkan = gagal, dilawan dengan arah ayunan = masuk', () => {
+  const go = (w, vy) => { const S = play('h', {err: 1, w}); applyHit(S, 'h', {x: 0, y: S.by, z: S.bz, r: 0, p: 0}, {s: 1.5, vy}, {dx: 0, dy: 0, along: .1}); const c = S.cause; run(S); return [S.why, c]; };
+  assert.deepEqual(go(.7, 1.5), ['out', 'topspin']); // topspin dibalas ayunan ke atas: melambung keluar
+  assert.equal(go(.7, -2)[0], 'miss'); // diredam ayunan datar ke bawah: masuk
+  assert.ok(['net', 'own'].includes(go(-.7, -1)[0])); // backspin dibalas ayunan turun: ke net
+  assert.equal(go(-.7, 2)[0], 'miss'); // diangkat: masuk
+});
+
+// ---------- lemparan servis dengan tangan bebas ----------
+test('tossDetect: diam lalu naik cepat = lempar; diam, naik pelan, getar, atau bergerak terus = bukan', () => {
+  const seq = f => Array.from({length: 40}, (_, i) => ({t: i / 60, y: f(i / 60)}));
+  assert.equal(tossDetect(seq(() => 1)), 0);
+  assert.equal(tossDetect(seq(t => 1 + .4 * Math.max(0, t - .45))), 0);
+  assert.equal(tossDetect(seq(t => 1 + .02 * Math.sin(t * 60))), 0);
+  assert.equal(tossDetect(seq(t => .8 + 1.2 * t)), 0); // bergerak terus tanpa jeda diam
+  const v = tossDetect(seq(t => 1 + 1.6 * Math.max(0, t - .52)));
+  assert.ok(v > 1.8 && v < 2.6, 'kecepatan ' + v);
+});
+
+test('lemparan tangan: menahan bola menunda servis otomatis; terlalu rendah salah hanya di realistis', () => {
+  const nobody = {swing: () => ({s: 1, vy: 0})};
+  const H = newState(); startRound(H, 7, 1); Object.assign(H, {hold: true, hx: 2});
+  for (let i = 0; i < 300; i++) step(H, 1 / 120, nobody);
+  assert.equal(H.toss, false); assert.equal(H.ph, 'serve');
+  const R = newState(); startRound(R, 7, 1); Object.assign(R, {err: 1, hx: 2, t: 0}); toss(R, 1.4, true);
+  for (let i = 0; i < 300 && R.ph === 'serve'; i++) step(R, 1 / 120, nobody);
+  assert.equal(R.why, 'lowtoss'); assert.equal(R.pw, 'g');
+  const N = newState(); startRound(N, 7, 1); Object.assign(N, {err: .6, t: 0}); toss(N, 1.4, true);
+  assert.ok(N.vy >= 1.9 && !N.lowToss); // berbantuan: dinaikkan agar sah
 });
