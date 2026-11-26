@@ -1,6 +1,6 @@
 // Simulasi pertandingan tanpa layar: bot pemain vs komputer, deterministik dengan seed. Dipakai tes dan penyetelan.
 import {newState, startRound, step, clamp} from '../js/physics.js';
-import {Cpu, intercept} from '../js/cpu.js';
+import {Cpu, intercept, aimBat} from '../js/cpu.js';
 
 export const seeded = s => () => (s = (s * 16807) % 2147483647) / 2147483647;
 const gauss = r => Math.sqrt(-2 * Math.log(r() + 1e-12)) * Math.cos(2 * Math.PI * r());
@@ -16,7 +16,7 @@ export class Bot {
     if (S.ph === 'play' && S.last === 'g') {
       if (!this.tgt && this.t - this.at > .28 - .12 * k) {
         const I = intercept(S, 'h');
-        if (I) { const sd = (.07 - .045 * k) * (1 + .2 * I.v + .8 * Math.abs(I.w)); this.tgt = {x: I.x + gauss(r) * sd, y: clamp(I.y + gauss(r) * sd * .6, .8, 1.4), z: clamp(I.z, 1.28, 1.62)}; }
+        if (I) { const sd = (.07 - .045 * k) * (1 + .2 * I.v + .8 * Math.abs(I.w)), b = aimBat(I, clamp(I.z, 1.28, 1.62), 'h'); this.tgt = {x: b.x + gauss(r) * sd, y: clamp(b.y + gauss(r) * sd * .6, .8, 1.4), z: b.z}; }
       }
       if (this.tgt) tgt = this.tgt; else tgt = {x: S.hx, y: S.hy, z: S.hz};
       S.hr = 1.05 * clamp((this.corner - .5 * S.hx) / .35, -1, 1);

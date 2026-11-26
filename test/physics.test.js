@@ -273,7 +273,7 @@ test('tanpa volley: bola belum memantul di meja sendiri tidak bisa dipukul', () 
 });
 
 // ---------- realisme: tingkat galat dan spin yang datang ----------
-test('tingkat galat: penuh 0%, normal sesekali, realistis 20-30% dengan keluar panjang terbanyak', () => {
+test('tingkat galat: penuh 0%, normal sesekali (~5%), realistis ~12% dengan keluar panjang terbanyak', () => {
   let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const gauss = () => Math.sqrt(-2 * Math.log(rnd() + 1e-12)) * Math.cos(2 * Math.PI * rnd());
   const rate = err => {
@@ -289,17 +289,18 @@ test('tingkat galat: penuh 0%, normal sesekali, realistis 20-30% dengan keluar p
   };
   assert.equal(rate(0).fail, 0);
   const n = rate(.6), r = rate(1);
-  assert.ok(n.fail > .05 && n.fail < .2, 'normal ' + n.fail);
-  assert.ok(r.fail > .2 && r.fail < .32, 'realistis ' + r.fail);
+  assert.ok(n.fail > .02 && n.fail < .09, 'normal ' + n.fail);
+  assert.ok(r.fail > .08 && r.fail < .17, 'realistis ' + r.fail);
   assert.ok(r.out.out > (r.out.net || 0) && r.out.out > (r.out.own || 0));
 });
 
 test('spin datang: dibiarkan = gagal, dilawan dengan arah ayunan = masuk', () => {
   const go = (w, vy) => { const S = play('h', {err: 1, w}); applyHit(S, 'h', {x: 0, y: S.by, z: S.bz, r: 0, p: 0}, {s: 1.5, vy}, {dx: 0, dy: 0, along: .1}); const c = S.cause; run(S); return [S.why, c]; };
-  assert.deepEqual(go(.7, 1.5), ['out', 'topspin']); // topspin dibalas ayunan ke atas: melambung keluar
-  assert.equal(go(.7, -2)[0], 'miss'); // diredam ayunan datar ke bawah: masuk
-  assert.ok(['net', 'own'].includes(go(-.7, -1)[0])); // backspin dibalas ayunan turun: ke net
-  assert.equal(go(-.7, 2)[0], 'miss'); // diangkat: masuk
+  assert.deepEqual(go(1, 1.5), ['out', 'topspin']); // topspin berat dibalas ayunan ke atas: melambung keluar
+  assert.equal(go(1, -2)[0], 'miss'); // diredam ayunan datar ke bawah: masuk
+  assert.ok(['net', 'own'].includes(go(-1, -1)[0])); // backspin berat dibalas ayunan turun: ke net
+  assert.equal(go(-1, 2)[0], 'miss'); // diangkat: masuk
+  assert.equal(go(.3, 1.5)[0], 'miss'); // spin ringan: teredam pukulan biasa
 });
 
 // ---------- lemparan servis dengan tangan bebas ----------

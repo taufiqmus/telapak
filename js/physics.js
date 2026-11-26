@@ -137,7 +137,7 @@ export function launch(S, side, bat, swing, q) {
   const ws = clamp((swing.vx || 0) / 3, -1, 1) * (S.ph === 'serve' ? .3 : .6); // ayunan menyamping = sidespin: bola membelok ke arah ayunan
   // e > 0: ayunan sangat keras dan arah ekstrem boleh melewati garis meja (bantuan penuh menjaga semuanya di dalam)
   const e = side === 'h' ? S.err : S.errG, wIn = S.ph === 'play' ? S.w : 0, sr = swing.s / 3;
-  const depth = .45 + .7 * Math.min(sr, 1) + .5 * clamp(sr - 1, 0, .8 * e) - .15 * pn;
+  const depth = .45 + .7 * Math.min(sr, 1) + .5 * clamp(sr - 1.3, 0, .8 * e) - .15 * pn; // memanjang hanya untuk ayunan > 3,9 m/s
   const zt = dir * (shot === 'smash' ? 1.15 : shot === 'lob' ? 1.05 : shot === 'drop' ? .32 : clamp(depth, .3, 1.25 + .5 * e)); // bilah menutup = lebih pendek dan datar, membuka = lebih dalam
   const aim = .5 * bat.x + .35 * clamp(bat.r / 1.05, -1, 1) - (S.bx - bat.x) * 1.5;
   const xt = clamp(aim, -.62 - .3 * e, .62 + .3 * e);
@@ -158,15 +158,15 @@ export function launch(S, side, bat, swing, q) {
   // Timing tidak dipakai: pukulan terjadi otomatis di frame pertama bola terjangkau, jadi 'along' hampir selalu sama.
   let cause = Math.abs(aim) > .7 && e ? 'sudut' : depth > 1.32 && e && !shot ? 'keras' : '';
   if (e && q && shot !== 'drop') {
-    const sweet = .4 * HIT, off = v => Math.sign(v) * Math.max(0, Math.abs(v) - sweet) / (HIT - sweet); // 0 di sweet spot, +-1 di tepi bat
-    const ox = clamp(off(q.dx), -1, 1), oy = clamp(off(q.dy), -1, 1), pw = .6 + .4 * Math.min(sr, 2);
+    const sweet = .5 * HIT, off = v => Math.sign(v) * Math.max(0, Math.abs(v) - sweet) / (HIT - sweet); // 0 di sweet spot, +-1 di tepi bat
+    const ox = clamp(off(q.dx), -1, 1), oy = clamp(off(q.dy), -1, 1), pw = .7 + .3 * Math.min(sr, 1.5);
     const cnt = .8 * pn - .8 * clamp((swing.vy || 0) / 2.5, -1, 1); // + melawan topspin, - melawan backspin
-    const mis = Math.sign(wIn) * Math.max(0, Math.abs(wIn) - Math.max(0, Math.sign(wIn) * cnt)); // sisa spin yang tidak dilawan
-    let dvy = 1.3 * oy * pw + 1.4 * mis, kz = 1 + .12 * oy * pw + .1 * mis;
-    const hard = swing.s >= SMASH_SPEED && !smash;
+    const mis = Math.sign(wIn) * Math.max(0, Math.abs(wIn) - .3 - Math.max(0, Math.sign(wIn) * cnt)); // sisa spin yang tidak dilawan; spin ringan teredam pukulan biasa
+    let dvy = 1.3 * oy * pw + 1.2 * mis, kz = 1 + .12 * oy * pw + .1 * mis;
+    const hard = swing.s >= SMASH_SPEED + 1 && !smash; // ayunan keras sekali pada bola yang tidak tinggi
     if (hard) { dvy += pn > .2 || pn < -.2 ? -.9 * pn : 0; kz += .06 + (pn < -.2 ? -.1 * pn : 0); }
     vy += e * dvy; vz *= 1 + e * (kz - 1); vx += e * 2.6 * ox * pw * ps;
-    const parts = [[Math.abs(1.3 * oy * pw), oy < 0 ? 'atas' : 'bawah'], [Math.abs(1.5 * ox * pw), 'samping'], [Math.abs(1.4 * mis), mis > 0 ? 'topspin' : 'backspin'], [hard ? .9 : 0, 'keras']];
+    const parts = [[Math.abs(1.3 * oy * pw), oy < 0 ? 'atas' : 'bawah'], [Math.abs(1.5 * ox * pw), 'samping'], [Math.abs(1.2 * mis), mis > 0 ? 'topspin' : 'backspin'], [hard ? .9 : 0, 'keras']];
     const big = parts.reduce((a, b) => b[0] > a[0] ? b : a, [.25, cause]);
     cause = big[1];
   }

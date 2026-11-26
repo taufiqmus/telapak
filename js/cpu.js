@@ -8,22 +8,22 @@
 //   bh: pengali galat dan reaksi di backhand risk: seberapa dekat ke garis meja ia membidik (0..1)
 //   power: rentang kecepatan ayun (m/s)      spin: kecenderungan memberi spin     smash: peluang smash bola tinggi
 //   lob, drop: peluang pukulan sengaja        press: kepekaan terhadap tekanan (reli panjang, poin penentu)
-import {clamp, fly, backhand, TY, NET_TOP} from './physics.js';
+import {clamp, fly, backhand, TY, NET_TOP, EYE_Y, EYE_Z} from './physics.js';
 
 export const LAWAN = [
   {id: 'rina', nama: 'Rina', gaya: 'Si tembok: sabar dan rapi, tapi lambat ke samping', kelemahan: 'Arahkan bola ke sudut bergantian',
-    mv: 2.2, acc: 9, react: .21, noise: .035, read: .85, bh: 1.1, risk: .1, power: [.8, 1.6], spin: .2, smash: 0, lob: .2, drop: 0, press: .5},
+    mv: 3, acc: 11, react: .2, noise: .035, read: .85, bh: 1.1, risk: .4, power: [.8, 1.6], spin: .2, smash: 0, lob: .2, drop: 0, press: .5},
   {id: 'bayu', nama: 'Bayu', gaya: 'Si pemutar: topspin dan backspin berat', kelemahan: 'Backhand-nya lemah',
-    mv: 2.2, acc: 8.5, react: .2, noise: .045, read: .7, bh: 1.9, risk: .3, power: [.9, 2], spin: .95, smash: .1, lob: 0, drop: .1, press: 1},
+    mv: 3, acc: 11.5, react: .17, noise: .042, read: .7, bh: 1.9, risk: .5, power: [.9, 2], spin: .95, smash: .1, lob: 0, drop: .1, press: 1},
   {id: 'dimas', nama: 'Dimas', gaya: 'Si cepat: menjangkau semua bola', kelemahan: 'Sering salah membaca spin',
-    mv: 3.2, acc: 12, react: .15, noise: .035, read: .35, bh: 1.1, risk: .4, power: [1, 2.6], spin: .5, smash: .3, lob: .05, drop: .05, press: 1},
+    mv: 3, acc: 11, react: .17, noise: .035, read: .35, bh: 1.1, risk: .4, power: [1, 2.6], spin: .5, smash: .3, lob: .05, drop: .05, press: 1},
   {id: 'sari', nama: 'Sari', gaya: 'Si penyerang: keras dan mepet garis', kelemahan: 'Sering memaksa, bola bisa keluar',
     mv: 2, acc: 7.5, react: .22, noise: .04, read: .6, bh: 1.2, risk: 1, power: [1.4, 3.4], spin: .4, smash: .6, lob: 0, drop: 0, press: 1.3},
   {id: 'juara', nama: 'Pak Juara', gaya: 'Juara kampung: semua bisa', kelemahan: 'Goyah di reli panjang dan poin penentu',
     mv: 3.3, acc: 12, react: .15, noise: .03, read: .85, bh: 1.15, risk: .5, power: [1.2, 3], spin: .7, smash: .5, lob: .05, drop: .1, press: 1.4}
 ];
 // Tanding cepat: level dari menu (Mudah 1.2, Sedang 2.2, Sulit 4).
-export const quick = lvl => ({id: 'cepat', nama: 'Komputer', kelemahan: '', mv: 2.3 + .28 * lvl, acc: 9 + .8 * lvl, react: .24 - .02 * lvl,
+export const quick = lvl => ({id: 'cepat', nama: 'Komputer', kelemahan: '', mv: 2.6 + .2 * lvl, acc: 10 + .5 * lvl, react: .22 - .015 * lvl,
   noise: .05 - .0045 * lvl, read: .2 + .15 * lvl, bh: 1.3, risk: .15 + .12 * lvl, power: [.8, 1.3 + .4 * lvl], spin: .4,
   smash: lvl > 3 ? .3 : .1, lob: .05, drop: .05, press: 1});
 export const MESIN = {id: 'mesin', nama: 'Mesin bola', mv: 0, acc: 0, react: 0, noise: 0, read: 0, bh: 1, risk: 0, power: [.6, 2.4], spin: .6, smash: 0, lob: 0, drop: 0, press: 0};
@@ -42,6 +42,13 @@ export function intercept(S, side = 'g') {
     if (bounced && k * B.bz >= 1.05 && (B.vy < 0 && B.by < 1.3 || k * B.bz > 1.55)) return {x: B.bx, y: B.by, z: B.bz, t: (i + 1) / 120, v: Math.hypot(B.vx, B.vz), w: B.w};
   }
   return null;
+}
+
+// Kena dinilai di garis pandang pemain (reach): bat di kedalaman z harus menutupi titik bola I di layar,
+// jadi posisinya diskalakan terhadap mata, bukan sekadar disamakan dengan x dan y bola.
+export function aimBat(I, z, side = 'g', eye = {x: 0, y: 0}) {
+  const s = side === 'h' ? 1 : -1, ex = s * eye.x, ey = EYE_Y + eye.y, k = (I.z - s * EYE_Z) / (z - s * EYE_Z);
+  return {x: ex + (I.x - ex) / k, y: ey + (I.y - ey) / k, z};
 }
 
 const gauss = rng => Math.sqrt(-2 * Math.log(rng() + 1e-12)) * Math.cos(2 * Math.PI * rng());
@@ -73,9 +80,9 @@ export class Cpu {
         const I = intercept(S, 'g');
         if (I) {
           const sd = p.noise * slow * stress * (1 + .2 * I.v + .8 * Math.abs(I.w)); // bola cepat dan berputar lebih sulit ditebak
-          pl.target = {x: I.x + gauss(r) * sd, y: clamp(I.y + gauss(r) * sd * .6, .8, 1.4), z: clamp(I.z, -1.62, -1.28)};
           pl.shot = I.z < -1.55 && r() < p.lob ? 'lob' : I.z > -1.3 && r() < p.drop ? 'drop' : ''; // hanya bila titik temunya cocok: lob dari jauh, drop dari dekat meja
-          if (pl.shot === 'lob') pl.target.z = -1.75; else if (pl.shot === 'drop') pl.target.z = -1.2;
+          const z = pl.shot === 'lob' ? -1.75 : pl.shot === 'drop' ? -1.2 : clamp(I.z, -1.62, -1.28), b = aimBat(I, z, 'g');
+          pl.target = {x: b.x + gauss(r) * sd, y: clamp(b.y + gauss(r) * sd * .6, .8, 1.4), z};
         }
       }
       if (pl.target) tgt = pl.target;
