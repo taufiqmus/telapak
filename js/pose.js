@@ -76,19 +76,27 @@ export class Tracker {
   }
 }
 
-let landmarker = null, lastVidT = -1, people = 1;
+let landmarker = null, lastVidT = -1, people = 1, files = null, model = '', skip = 0;
 export const poseStat = {ready: false, frames: 0};
 
 export async function loadPose(vid, acc) {
   if (poseStat.ready) return;
   vid.srcObject = await navigator.mediaDevices.getUserMedia({video: {width: 640, height: 480, facingMode: 'user'}});
   await vid.play();
-  const fs = await FilesetResolver.forVisionTasks(WASM);
-  landmarker = await PoseLandmarker.createFromOptions(fs, {
-    baseOptions: {modelAssetPath: MODEL(acc), delegate: "GPU"},
-    runningMode: "VIDEO", numPoses: 1
-  });
+  files = await FilesetResolver.forVisionTasks(WASM); model = acc;
+  await create("GPU");
   poseStat.ready = true;
+}
+async function create(delegate) {
+  landmarker = await PoseLandmarker.createFromOptions(files, {baseOptions: {modelAssetPath: MODEL(model), delegate}, runningMode: "VIDEO", numPoses: people});
+  poseStat.delegate = delegate;
+}
+// GPU gagal (driver, memori, konteks WebGL hilang): pindah ke CPU sekali, game jalan terus tanpa pose sementara.
+async function fallback(e) {
+  console.error('Deteksi pose gagal di', poseStat.delegate, e);
+  poseStat.ready = false;
+  try { if (landmarker) landmarker.close(); } catch { /* sudah rusak */ }
+  if (poseStat.delegate === "GPU") { await create("CPU"); poseStat.ready = true; }
 }
 
 export async function setPeople(n) {
@@ -100,8 +108,12 @@ export async function setPeople(n) {
 // Tiap orang hanya memakai separuh gambarnya, jadi rentang x-nya dipetakan ulang ke lebar penuh.
 export function readPose(vid, trackers, o) {
   if (!poseStat.ready || vid.currentTime === lastVidT) return;
+  if (skip > 0) { skip--; return; } // deteksi lambat: lewati frame berikutnya supaya layar tetap mulus
   lastVidT = vid.currentTime; poseStat.frames++;
-  const now = performance.now(), res = landmarker.detectForVideo(vid, now);
+  const now = performance.now();
+  let res;
+  try { res = landmarker.detectForVideo(vid, now); } catch (e) { fallback(e).catch(err => console.error('Pose CPU juga gagal', err)); return; }
+  const took = performance.now() - now; skip = took > 40 ? 2 : took > 22 ? 1 : 0;
   if (trackers.length === 1) return trackers[0].update(res.landmarks[0], res.worldLandmarks[0], now, {...o, a: .15, b: .85});
   const ps = res.landmarks.map((lm, i) => ({lm, wl: res.worldLandmarks[i], sx: 1 - (lm[11].x + lm[12].x) / 2})).sort((p, q) => p.sx - q.sx);
   let L = null, R = null;

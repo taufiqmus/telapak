@@ -408,6 +408,7 @@ const snapBall = () => ({bx: S.bx, by: S.by, bz: S.bz, vx: S.vx, vz: S.vz, w: S.
 
 let prev = performance.now(), nDraw = 0, tFps = performance.now(), lastPose = 0;
 function tick(now) {
+  requestAnimationFrame(tick); // dijadwalkan dulu: error di satu frame tidak boleh membekukan game
   const dt = Math.min((now - prev) / 1000, .033); prev = now;
   const duo = role === 'duo', W = cv.clientWidth, H = cv.clientHeight, aspect = duo ? W / 2 / H : W / H;
   readPose(vid, trackers, {hand: $('hand').value, hand2: [$('hand').value, $('hand').value], smooth: +$('smooth').value, pitch: $('pitch').checked});
@@ -475,10 +476,9 @@ function tick(now) {
   nDraw++;
   if (now - tFps >= 1000) {
     const k = 1000 / (now - tFps);
-    $('fps').textContent = poseStat.ready && !mouseCtl() ? `Pose ${Math.round(poseStat.frames * k)} FPS, layar ${Math.round(nDraw * k)} FPS` : role ? `Layar ${Math.round(nDraw * k)} FPS` : '';
+    $('fps').textContent = poseStat.ready && !mouseCtl() ? `Pose ${Math.round(poseStat.frames * k)} FPS${poseStat.delegate === 'CPU' ? ' (CPU)' : ''}, layar ${Math.round(nDraw * k)} FPS` : role ? `Layar ${Math.round(nDraw * k)} FPS` : '';
     poseStat.frames = nDraw = 0; tFps = now;
   }
-  requestAnimationFrame(tick);
 }
 const other = p => p === 'h' ? 'g' : 'h';
 let prevOwnG = null;
