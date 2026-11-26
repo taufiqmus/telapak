@@ -1,5 +1,5 @@
 // Perekat: layar menu, mode permainan, input, loop utama, duel jaringan.
-import {newState, startRound, step, tryHit, applyHit, canHit, batOf, fly, handToBat, ndcToHand, clamp, backhand, calRange, NET_TOP, PROTO} from './physics.js';
+import {newState, startRound, step, tryHit, applyHit, canHit, batOf, fly, handToBat, ndcToHand, clamp, backhand, calRange, NET_TOP, TY, PROTO} from './physics.js';
 import {Tracker, loadPose, readPose, setPeople, poseStat} from './pose.js';
 import {Cpu, LAWAN, quick, MESIN} from './cpu.js';
 import {createScene, COLOR} from './scene.js';
@@ -194,16 +194,20 @@ function guestSync() {
   if (pend && S.hits < pend.hits && performance.now() - pend.at < 600) return; // pukulan kita belum sampai ke host: pakai prediksi
   if (pend && S.hits < pend.hits) fx.hits = S.hits; // ditolak host: efeknya jangan menelan pukulan berikutnya
   pend = null;
-  const T = {bx: S.bx, by: S.by, bz: S.bz, vx: S.vx, vy: S.vy, vz: S.vz, w: S.w};
+  const T = {bx: S.bx, by: S.by, bz: S.bz, vx: S.vx, vy: S.vy, vz: S.vz, w: S.w, ws: S.ws, cord: S.cord};
   if (S.ph === 'play') fly(T, Math.min(rtt / 2, 150) / 1000 / S.ts);
   const far = Math.hypot(GB.bx - T.bx, GB.by - T.by, GB.bz - T.bz) > .4;
-  for (const k in T) GB[k] = S.ph !== 'play' || far || k[0] === 'v' || k === 'w' ? T[k] : GB[k] + (T[k] - GB[k]) * .3;
+  for (const k in T) GB[k] = S.ph !== 'play' || far || k[0] !== 'b' ? T[k] : GB[k] + (T[k] - GB[k]) * .3; // hanya posisi yang dihaluskan
 }
+const gBn = {hits: -1, n: 0}; // pantulan bola di meja tamu menurut prediksi tamu sendiri
 function guestTick(dt, own, eye) {
+  if (gBn.hits !== S.hits) { gBn.hits = S.hits; gBn.n = 0; }
+  const vy0 = GB.vy;
   if ((S.ph === 'play' || pend) && !S.paused) fly(GB, dt / S.ts); // servis yang sudah kita pukul ikut terbang sebelum host mengonfirmasi
+  if (vy0 < 0 && GB.vy > 0 && GB.bz < -.05 && GB.by < TY + .15) gBn.n++;
   if (pend || S.paused) return;
   // tamu menilai pukulannya sendiri terhadap bola yang ia lihat, lalu memberi tahu host (pemukul diuntungkan)
-  const T = {...S, ...GB, gx: own.x, gy: own.y, gz: own.z, gr: own.r, gp: own.p, gex: eye.x, gey: eye.y, near: {h: null, g: null}};
+  const T = {...S, ...GB, gx: own.x, gy: own.y, gz: own.z, gr: own.r, gp: own.p, gex: eye.x, gey: eye.y, bn: Math.max(S.bn, gBn.n), near: {h: null, g: null}};
   let q = null;
   if (!tryHit(T, 'g', {swing: () => ({...sp.g}), onHit: (s, r) => { q = {dx: r.dx, dy: r.dy, along: r.along}; }})) return;
   const m = {t: 'hit', id: ++hitId, bx: GB.bx, by: GB.by, bz: GB.bz, bat: own, sw: {...sp.g}, q};
@@ -216,7 +220,8 @@ function guestTick(dt, own, eye) {
 function hostHit(d) {
   if (d.id <= lastHitId) return; lastHitId = d.id;
   if (S.ph === 'point' && lastEnd && performance.now() - lastEnd.at < 300) { Object.assign(S, lastEnd.s); lastEnd = null; }
-  if (!canHit(S, 'g') || Math.hypot(S.bx - d.bx, S.by - d.by, S.bz - d.bz) > .8) return;
+  const serve = S.ph === 'serve' && S.srv === 'g'; // lemparan servis tamu dinilai tamu; host hanya memeriksa jarak bola
+  if (!(serve || canHit(S, 'g')) || Math.hypot(S.bx - d.bx, S.by - d.by, S.bz - d.bz) > .8) return;
   S.bx = d.bx; S.by = d.by; S.bz = d.bz;
   const b = {x: clamp(d.bat.x, -2, 2), y: clamp(d.bat.y, .2, 2), z: clamp(d.bat.z, -1.9, -1), r: clamp(d.bat.r, -1.3, 1.3), p: clamp(d.bat.p, -1.2, 1.2)};
   Object.assign(S, {gx: b.x, gy: b.y, gz: b.z, gr: b.r, gp: b.p});

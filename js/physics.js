@@ -101,20 +101,20 @@ function serveSolve(S, side, w, ws, x2, z2) {
     const cost = Math.abs(land.z - z2) + .5 * Math.abs(land.x - x2);
     if (!best || cost < best.cost) best = {cost, v};
   }
-  return best && best.v;
+  return best && {...best.v, ws};
 }
 // q: kualitas kontak dari reach() {dx, dy, along}; tanpa q = kontak sempurna.
 export function launch(S, side, bat, swing, q) {
   const dir = side === 'h' ? -1 : 1, s = clamp(swing.s / 3), pn = clamp((bat.p || 0) / .6, -1, 1), ps = side === 'h' ? 1 : -1;
   const smash = S.ph === 'play' && swing.s >= SMASH_SPEED && S.by > NET_TOP + .12, shot = shotType(S, bat, swing, smash);
-  const w = shot === 'smash' ? .3 : shot === 'lob' ? .1 : shot === 'drop' ? -.6
+  const w = shot === 'smash' ? .3 : shot === 'lob' ? .1 : shot === 'drop' ? -.9
     : clamp(clamp((swing.vy || 0) / 2.5, -1, 1) + .35 * pn, -1, 1) * (S.ph === 'serve' ? .5 : 1); // ayun ke atas atau bilah menutup = topspin; bilah membuka = backspin
   const ws = clamp((swing.vx || 0) / 3, -1, 1) * (S.ph === 'serve' ? .3 : .6); // ayunan menyamping = sidespin: bola membelok ke arah ayunan
   const zt = dir * (shot === 'smash' ? 1.15 : shot === 'lob' ? 1.05 : shot === 'drop' ? .32 : clamp(.45 + .7 * s - .15 * pn, .3, 1.25)); // bilah menutup = lebih pendek dan datar, membuka = lebih dalam
   const xt = clamp(.5 * bat.x + .35 * clamp(bat.r / 1.05, -1, 1) - (S.bx - bat.x) * 1.5, -.62, .62);
   const g = grav(w), ax = SIDE_G * ws;
-  let t = shot === 'smash' ? .28 : shot === 'lob' ? 1.15 : shot === 'drop' ? .5 : (S.ph === 'serve' ? .42 : .6 - .25 * s) * (1 - .3 * pn), vx, vy, vz; // servis: lintasan rendah
-  const sv = S.ph === 'serve' && serveSolve(S, side, w, ws, xt, dir * clamp(.5 + .65 * s - .15 * pn, .4, 1.2));
+  let t = shot === 'smash' ? .28 : shot === 'lob' ? 1.15 : shot === 'drop' ? .7 : (S.ph === 'serve' ? .42 : .6 - .25 * s) * (1 - .3 * pn), vx, vy, vz; // servis: lintasan rendah
+  const z2 = dir * clamp(.5 + .65 * s - .15 * pn, .4, 1.2), sv = S.ph === 'serve' && (serveSolve(S, side, w, ws, xt, z2) || serveSolve(S, side, w, ws, xt * .4, z2) || serveSolve(S, side, w, 0, 0, z2)); // sudut tak terjangkau: geser ke tengah, lalu buang sidespin
   if (sv) ({vx, vy, vz} = sv);
   else for (; t <= 2.6; t += .05) {
     vx = (xt - S.bx - .5 * ax * t * t) / t; vz = (zt - S.bz) / t; vy = (TY + BR - S.by + .5 * g * t * t) / t;
@@ -133,7 +133,7 @@ export function launch(S, side, bat, swing, q) {
     if (swing.s >= SMASH_SPEED && !smash) { dvy += pn > .2 || pn < -.2 ? -.9 * pn : 0; kz += .06 + (pn < -.2 ? -.1 * pn : 0); }
     vy += e * dvy; vz *= 1 + e * (kz - 1); vx += e * 2 * ox * ps;
   }
-  S.vx = vx; S.vy = vy; S.vz = vz; S.w = w; S.ws = ws; S.tx = xt; S.tz = zt; S.shot = shot;
+  S.vx = vx; S.vy = vy; S.vz = vz; S.w = w; S.ws = sv ? sv.ws : ws; S.tx = xt; S.tz = sv ? z2 : zt; S.shot = shot;
   return smash;
 }
 
@@ -246,8 +246,9 @@ export function step(S, dt, opt) {
     if (!S.toss) { if (S.t <= 0) { S.toss = true; S.vy = TOSS_V; } return; } // jeda dulu, lalu bola dilempar ke atas
     const h = dt / S.ts; S.vy -= G * h; S.by += S.vy * h;
     if (S.vy < 0) tryHit(S, S.srv, opt);
-    if (S.ph === 'serve' && S.by < TY + .02) { // lemparan jatuh tanpa terpukul
-      if (S.err >= 1 && S.srv === 'h' || S.errG >= 1 && S.srv === 'g') return endPoint(S, S.srv, 'toss'); // realistis: poin hilang
+    const far = opt.remote && opt.remote(S.srv); // servis tamu dinilai di laptop tamu: beri waktu pukulannya sampai, jangan beri poin
+    if (S.ph === 'serve' && S.by < (far ? TY - .35 : TY + .02)) { // lemparan jatuh tanpa terpukul
+      if (!far && (S.err >= 1 && S.srv === 'h' || S.errG >= 1 && S.srv === 'g')) return endPoint(S, S.srv, 'toss'); // realistis: poin hilang
       S.toss = false; S.by = TOSS_Y; S.vy = 0; S.t = .6; // berbantuan: lempar ulang
     }
   } else if (S.ph === 'play') {

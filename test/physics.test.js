@@ -160,6 +160,9 @@ test('kalibrasi lengkap: rentang pribadi, netral di tengah, sumbu sempit ditolak
   assert.equal(sempit.x, null); assert.equal(sempit.z, null); assert.ok(sempit.y);
 });
 
+// kunci yang dikirim host ke prediksi bola tamu (guestSync di main.js)
+const guestKeys = S => ({bx: S.bx, by: S.by, bz: S.bz, vx: S.vx, vy: S.vy, vz: S.vz, w: S.w, ws: S.ws, cord: S.cord});
+
 // ---------- dinamika: galat kontak, net cord, let, lob, drop, bola tepi, sidespin ----------
 const play = (side = 'h', over = {}) => { const k = side === 'h' ? 1 : -1, S = newState(); Object.assign(S, {ph: 'play', bx: 0, by: 1.05, bz: k * 1.2, last: null}, over); return S; };
 const hitAndRun = (S, side, swing, q) => { applyHit(S, side, {x: 0, y: S.by, z: S.bz, r: 0, p: 0}, swing, q); run(S); return S.why; };
@@ -213,14 +216,14 @@ test('sidespin: bola membelok tapi tetap mendarat, prediksi tamu ikut', () => {
     const B = {...S}; run(S); assert.equal(S.why, 'miss', `vx=${vx} ${side}`);
   }
   const S = play('h'); applyHit(S, 'h', {x: 0, y: 1.05, z: 1.2, r: 0, p: 0}, {s: 1.5, vy: 0, vx: 4});
-  const B = {...S};
+  const B = guestKeys(S);
   for (let i = 0; i < 120 && S.bn === 0 && S.ph === 'play'; i++) { step(S, 1 / 120, blocked); fly(B, 1 / 120); }
   assert.ok(Math.abs(S.bx - B.bx) < 1e-9 && Math.abs(S.bz - B.bz) < 1e-9);
 });
 
 test('fly sama dengan simulasi melewati serempetan net', () => {
   const S = newState(); Object.assign(S, {ph: 'play', last: 'h', rally: 3, bx: 0, by: NET_TOP + .06, bz: .3, vx: .2, vy: .2, vz: -3, w: .2});
-  const B = {...S};
+  const B = guestKeys(S);
   for (let i = 0; i < 200 && S.bn === 0 && S.ph === 'play'; i++) { step(S, 1 / 120, blocked); fly(B, 1 / 120); }
   assert.equal(S.cords, 1); assert.ok(Math.abs(S.bz - B.bz) < 1e-9 && Math.abs(S.by - B.by) < 1e-9);
 });
@@ -228,16 +231,16 @@ test('fly sama dengan simulasi melewati serempetan net', () => {
 // ---------- servis asli: lempar, pantul di meja sendiri dulu, tanpa volley ----------
 test('servis berbantuan selalu sah: pantul di meja sendiri, lalu di meja lawan', () => {
   let n = 0;
-  for (const srv of ['h', 'g']) for (const s of [0, 1, 2.5, 4]) for (const vy of [-3, 0, 3]) for (const p of [-.6, 0, .6]) for (const r of [-1, 0, 1]) for (const vx of [-3, 3]) {
-    const S = newState(); S.sl = srv === 'h' ? 0 : 2; nextServe(S); Object.assign(S, {toss: true, vy: -1});
+  for (const srv of ['h', 'g']) for (const s of [0, 1, 2.5, 4]) for (const vy of [-3, 0, 3]) for (const p of [-.6, 0, .6]) for (const r of [-1, 0, 1]) for (const vx of [-3, 3]) for (const [by, bx] of [[.95, 0], [.8, .2], [1.27, -.2]]) {
+    const S = newState(); S.sl = srv === 'h' ? 0 : 2; nextServe(S); Object.assign(S, {toss: true, vy: -1, by});
     const k = srv === 'h' ? 1 : -1;
-    applyHit(S, srv, {x: 0, y: S.by, z: S.bz, r, p}, {s, vy, vx});
+    applyHit(S, srv, {x: bx, y: S.by, z: S.bz, r, p}, {s, vy, vx});
     let own = 0;
     for (let i = 0; i < 3000 && S.ph === 'play'; i++) { const b = S.bounces; step(S, 1 / 240, blocked); if (S.bounces > b && Math.sign(S.bz) === k) own++; }
-    assert.equal(S.why, 'miss', `${srv} s=${s} vy=${vy} p=${p} r=${r} vx=${vx}: ${S.why}`); assert.equal(S.pw, srv); assert.equal(own, 1);
+    assert.equal(S.why, 'miss', `${srv} s=${s} vy=${vy} p=${p} r=${r} vx=${vx} by=${by} bx=${bx}: ${S.why}`); assert.equal(S.pw, srv); assert.equal(own, 1);
     n++;
   }
-  assert.ok(n > 400);
+  assert.ok(n > 1200);
 });
 
 test('servis langsung ke meja lawan = servis tidak sah', () => {
@@ -250,9 +253,13 @@ test('lemparan servis: dipukul saat turun; tidak terpukul = lempar ulang (berban
   const A = newState(); startRound(A, 7, 1); A.err = .6;
   for (let i = 0; i < 400; i++) step(A, 1 / 120, nobody);
   assert.equal(A.ph, 'serve'); assert.equal(A.sl + A.sr, 0);
-  const B = newState(); startRound(B, 7, 1); B.err = 1;
-  for (let i = 0; i < 400 && B.ph === 'serve'; i++) step(B, 1 / 120, nobody);
+  const away = {swing: () => ({s: 1, vy: 0})}; // bat jauh dari bola, servis dinilai lokal
+  const B = newState(); startRound(B, 7, 1); Object.assign(B, {err: 1, hx: 2});
+  for (let i = 0; i < 400 && B.ph === 'serve'; i++) step(B, 1 / 120, away);
   assert.equal(B.why, 'toss'); assert.equal(B.pw, 'g');
+  const G = newState(); startRound(G, 7, 1); G.err = 1; // servis tamu: host tidak memberi poin lemparan
+  for (let i = 0; i < 400; i++) step(G, 1 / 120, nobody);
+  assert.equal(G.ph, 'serve'); assert.equal(G.sl + G.sr, 0);
   const C = newState(); startRound(C, 7, 1); let rising = false;
   const hitter = {swing: () => ({s: 1.5, vy: 0}), onHit: () => { rising = C.vy > 0 && C.ph === 'serve'; }};
   for (let i = 0; i < 400 && C.ph === 'serve'; i++) { Object.assign(C, {hx: C.bx, hy: C.by, hz: C.bz}); step(C, 1 / 120, hitter); }
