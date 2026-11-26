@@ -281,7 +281,7 @@ export function step(S, dt, opt) {
   if (S.ph !== 'over') S.dur += dt;
   if (S.ph === 'serve') {
     S.t -= dt;
-    if (!S.toss) { if (S.t <= 0 && !S.hold) toss(S, TOSS_V); return; } // jeda dulu, lalu bola dilempar ke atas (atau menunggu tangan pemain)
+    if (!S.toss) { if (S.t <= 0 && (!S.hold || S.t < -5)) toss(S, TOSS_V); return; } // jeda dulu, lalu dilempar; tangan pemain ditunggu paling lama 5 s
     const h = dt / S.ts, vy0 = S.vy; S.vy -= G * h; S.by += S.vy * h;
     if (S.lowToss && vy0 >= 0 && S.vy < 0) return endPoint(S, S.srv, 'lowtoss'); // lemparan tangan terlalu rendah (realistis)
     if (S.vy < 0) tryHit(S, S.srv, opt);

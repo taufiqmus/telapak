@@ -150,7 +150,7 @@ function bindConn(c) {
       if (d.n <= rxN) return; rxN = d.n; // paket bisa datang tidak berurutan
       S.gx = clamp(d.x, -2, 2); S.gy = clamp(d.y, .2, 2); S.gz = clamp(d.z, -1.9, -1); S.gr = clamp(d.r, -1.3, 1.3); S.gp = clamp(d.p, -1.2, 1.2); S.gh = d.h === 'L' ? 'L' : 'R';
       S.gex = clamp(+d.ex || 0, -.45, .45); S.gey = clamp(+d.ey || 0, -.35, .25);
-      if (S.ph === 'serve' && S.srv === 'g' && !S.toss) { S.hold = Array.isArray(d.hold); if (S.hold) { S.bx = clamp(+d.hold[0] || 0, -.6, .6); S.by = clamp(+d.hold[1] || 1, .8, 1.35); } }
+      if (S.ph === 'serve' && S.srv === 'g' && !S.toss) { S.hold = d.hold != null; if (Array.isArray(d.hold)) { S.bx = clamp(+d.hold[0] || 0, -.6, .6); S.by = clamp(+d.hold[1] || 1, .8, 1.35); } }
     } else if (d.t === 's' && role === 'guest') {
       if (d.n > rxN) { rxN = d.n; Object.assign(S, d.s); guestSync(); }
     } else if (d.t === 'hit' && role === 'host') hostHit(d);
@@ -413,7 +413,7 @@ function hud() {
     else if (S.paused) msg = 'Jeda';
     else if (conn && performance.now() - rxT > 2000) msg = 'Menunggu lawan…';
     else if (S.ph === 'wait') msg = 'Menunggu lawan siap…';
-    else if (S.ph === 'serve') msg = lat ? '' : duo ? (S.srv === 'h' ? 'Servis: pemain kiri' : 'Servis: pemain kanan') : S.srv === me ? (S.toss || gToss ? 'Servis: pukul saat bola turun' : S.hold ? (S.t > 0 ? 'Servis: pegang bola di tangan bebas, depan dada' : 'Servis: lempar bola ke atas dengan tangan bebas') : 'Servis: bola akan dilempar') : 'Lawan servis';
+    else if (S.ph === 'serve') msg = lat ? '' : duo ? (S.srv === 'h' ? 'Servis: pemain kiri' : 'Servis: pemain kanan') : S.srv === me ? (S.toss || gToss ? 'Servis: pukul saat bola turun' : S.hold ? (S.t > 0 ? 'Servis: pegang bola di tangan bebas, depan dada' : S.t > -2.5 ? 'Servis: lempar bola ke atas dengan tangan bebas' : 'Servis: angkat tangan bebas lebih cepat') : 'Servis: bola akan dilempar') : 'Lawan servis';
     else if (S.ph === 'point' && S.why === 'let') msg = 'Let: servis menyentuh net, diulang';
     else if (S.ph === 'point') {
       const why = S.why === 'miss' ? (S.miss && S.miss.side === me && !duo ? missText(S.miss) : '') : WHY[S.why] + (S.last === me && !duo && CAUSE[S.cause] && ['net', 'out', 'wide', 'own'].includes(S.why) ? ', ' + CAUSE[S.cause] : '');
@@ -530,7 +530,7 @@ function tick(now) {
       swing: side => cpu && side === 'g' ? cpu.swing(S) : {...sp[side]},
       remote: side => role === 'host' && side === 'g',
       onHit: (side, r, smash) => {
-        if (side === ownSide() || duo) { if (!duo) { onMyHit(S, smash); store.logShot({hit: 1, d: +r.d.toFixed(3), along: +r.along.toFixed(3), bh: +backhand(side, batOf(S, side).x, myHand()), p: +batOf(S, side).p.toFixed(2)}); } if (side === 'h') tutHit(); }
+        if (side === ownSide() || duo) { if (!duo) { onMyHit(S, smash); store.logShot({hit: 1, d: +r.d.toFixed(3), along: +r.along.toFixed(3), cause: S.cause, w: +S.w.toFixed(2), bh: +backhand(side, batOf(S, side).x, myHand()), p: +batOf(S, side).p.toFixed(2)}); } if (side === 'h') tutHit(); }
       }
     });
     if (S.hits !== hits) hitstop = reduced.matches || net() ? 0 : S.smashes > fx.smashes ? .12 : .045; // duel: tanpa hitstop, prediksi bola tamu tidak mengenalnya
@@ -544,15 +544,18 @@ function tick(now) {
     } else if (S.ph !== 'play') rec.length = 0;
   } else if (role === 'guest' && conn && conn.open) {
     measureSwingGuest(own.g, dt);
+    if (gToss) { // lemparan tamu selesai bila host sudah melempar ulang, bola sudah dipukul, atau bola jatuh
+      if (S.toss) gToss.seen = true;
+      if (gToss.seen && !S.toss || S.ph !== 'serve' || GB.by < TY - .4) gToss = null;
+    }
     const hs = handServe('g', aspect, eye.g, now);
     if (hs && hs.pos && !gToss) { GB.bx = hs.pos.x; GB.by = hs.pos.y; GB.vy = 0; }
     if (hs && hs.v && !gToss) {
       const tmp = {...S}; toss(tmp, hs.v, true); GB.vy = tmp.vy; tossBuf.length = 0;
       gToss = {id: ++tossId}; send({t: 'toss', id: gToss.id, x: GB.bx, y: GB.by, v: hs.v}, 3);
     }
-    if (gToss && S.ph !== 'serve') gToss = null;
     guestTick(dt, own.g, eye.g);
-    send({t: 'p', n: ++txN, ...own.g, h: myHand(), ex: eye.g.x, ey: eye.g.y, hold: hs && hs.pos && !gToss ? [GB.bx, GB.by] : null});
+    send({t: 'p', n: ++txN, ...own.g, h: myHand(), ex: eye.g.x, ey: eye.g.y, hold: hs || gToss ? (hs && hs.pos && !gToss ? [GB.bx, GB.by] : 1) : null}); // 1 = masih menahan, posisi tak berubah
     if (now - lastPose > 1000) { lastPose = now; send({t: 'ping', c: now}); }
   }
   if (role === 'host' && conn && conn.open) send({t: 's', n: ++txN, s: S});

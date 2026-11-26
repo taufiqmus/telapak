@@ -324,3 +324,9 @@ test('lemparan tangan: menahan bola menunda servis otomatis; terlalu rendah sala
   const N = newState(); startRound(N, 7, 1); Object.assign(N, {err: .6, t: 0}); toss(N, 1.4, true);
   assert.ok(N.vy >= 1.9 && !N.lowToss); // berbantuan: dinaikkan agar sah
 });
+
+test('bola yang ditahan tetap dilempar otomatis setelah 5 detik (gerak lempar tak terbaca)', () => {
+  const S = newState(); startRound(S, 7, 1); Object.assign(S, {hold: true, hx: 2});
+  for (let i = 0; i < 120 * 8 && !S.toss; i++) step(S, 1 / 120, {swing: () => ({s: 1, vy: 0})}); // jeda awal 1,5 s + tunggu 5 s
+  assert.equal(S.toss, true);
+});
