@@ -283,11 +283,10 @@ function onMyHit(T, smash) { // statistik pukulan pemain laptop ini
 function fxHit(D, side) {
   const smash = D.smashes > fx.smashes;
   view.burst({x: D.bx, y: D.by, z: D.bz}, smash ? 0xffffff : COLOR[side], smash ? 30 : 14, smash ? 2.6 : 1.5);
-  if (smash) { snd.sSmash(); flash('SMASH!'); if (!reduced.matches) view.kick(.08); view.cheer(1.2); }
+  if (smash) { snd.sSmash(); if (!reduced.matches) view.kick(.08); view.cheer(1.2); }
   else snd.sHit(clamp(Math.hypot(D.vx, D.vz) / 8));
   fx.smashes = D.smashes;
 }
-function flash(t) { const e = $('flash'); e.textContent = t; e.classList.remove('on'); void e.offsetWidth; e.classList.add('on'); }
 let toastQ = Promise.resolve();
 function progress(delta) {
   const baru = store.add(prog, delta); store.save(prog);

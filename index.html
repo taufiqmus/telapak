@@ -14,7 +14,7 @@
   :root{--lantai:#5a1a1c;--meja:#0b4a9e;--karet:#c8102e;--bola:#ff9a3c;--garis:#f7f9fc;--hitam:#15171b;color-scheme:dark}
   *{box-sizing:border-box}
   html,body{height:100%;margin:0;overflow:hidden;background:var(--lantai);color:var(--garis);font:16px/1.45 Barlow,system-ui,sans-serif}
-  h1,h2,.card,#msg,#rally,.big,#flash{font-family:"Barlow Condensed","Arial Narrow",sans-serif;font-weight:700}
+  h1,h2,.card,#msg,#rally,.big{font-family:"Barlow Condensed","Arial Narrow",sans-serif;font-weight:700}
   #stage,canvas#cv{position:absolute;inset:0;width:100%;height:100%;display:block}
   body[data-screen=main] canvas#cv{touch-action:none}
   [hidden]{display:none!important}
@@ -31,9 +31,6 @@
   @keyframes flip{from{transform:rotateX(-90deg)}to{transform:none}}
   #goal{position:absolute;top:112px;width:100%;text-align:center;font-size:15px;text-shadow:0 1px 4px #000}
   #msg{position:absolute;top:140px;width:100%;padding:0 16px;text-align:center;font-size:clamp(26px,4.4vw,46px);line-height:1.1;text-shadow:0 2px 10px #000;pointer-events:none;text-wrap:balance}
-  #flash{position:absolute;top:38%;width:100%;text-align:center;font-size:clamp(60px,12vw,150px);color:#fff;text-shadow:0 0 30px var(--bola),0 4px 0 var(--karet);pointer-events:none;opacity:0}
-  #flash.on{animation:flash .9s ease-out}
-  @keyframes flash{0%{opacity:0;transform:scale(.6)}15%{opacity:1;transform:scale(1.08)}70%{opacity:1;transform:none}100%{opacity:0}}
   #tip{position:absolute;bottom:64px;left:50%;transform:translateX(-50%);width:min(92vw,620px);text-align:center;font-weight:600;font-size:19px;background:#15171be6;border-left:6px solid var(--bola);border-radius:10px;padding:10px 16px;pointer-events:none}
   #tip:empty{display:none}
   #toast{position:absolute;top:110px;right:14px;max-width:min(80vw,340px);background:#15171bf0;border-left:6px solid #facc15;border-radius:10px;padding:10px 14px;font-weight:600;animation:masuk .3s ease-out}
@@ -69,7 +66,7 @@
   .lawan{display:flex;flex-direction:column;align-items:flex-start;width:100%;text-align:left;margin:6px 0}
   .lawan small{font-weight:400;opacity:.85}
   #achL{list-style:none;padding:0;margin:0 0 18px}#achL li{padding:4px 0;opacity:.55}#achL li.buka{opacity:1}#achL span{font-size:14px}
-  @media (prefers-reduced-motion:reduce){.card.flip,#flash.on,#toast{animation:none}#flash.on{opacity:1}}
+  @media (prefers-reduced-motion:reduce){.card.flip,#toast{animation:none}}
   @media (max-height:680px){#goal{display:none}#msg{top:106px;font-size:28px}}
   @media (max-width:700px){.card{width:54px;height:62px;font-size:46px}.nm{font-size:18px}#goal{top:84px}#msg{top:108px}#tools{top:auto;bottom:14px}#fps{display:none}#tip{bottom:76px;font-size:16px}}
 </style>
@@ -83,7 +80,6 @@
   </div>
   <div id="fps"></div>
   <div id="msg" role="status" aria-live="polite"></div>
-  <div id="flash" aria-hidden="true"></div>
   <div id="tip" role="status" aria-live="polite"></div>
   <div id="toast" role="status" hidden></div>
   <div id="pip"><video id="vid" playsinline muted></video><canvas id="dots" width="160" height="120"></canvas></div>
