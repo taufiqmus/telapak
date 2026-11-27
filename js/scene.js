@@ -2,7 +2,7 @@
 // Tingkat grafis bisa diganti saat main (setQuality): renderer tetap sama, yang berubah resolusi, bayangan,
 // tone mapping, peta lingkungan, tekstur, detail penonton, dan pasca-proses.
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
-import {TL, TW, TY, NET_TOP, BR, EYE_Y, EYE_Z, LOOK_Y, LOOK_Z, FOV, clamp, backhand} from './physics.js';
+import {TL, TW, TY, NET_TOP, BR, BIG, EYE_Y, EYE_Z, LOOK_Y, LOOK_Z, FOV, clamp, backhand} from './physics.js';
 
 export const COLOR = {h: 0x2f7de1, g: 0xdc2626};
 
@@ -114,12 +114,12 @@ export function createScene(cv) {
 
   // bola + bayangan palsu (tingkat tanpa bayangan) + jejak
   const ballMat = mat(0xffa94d, {emissive: 0xff7a00, emissiveIntensity: .35});
-  const ball = new THREE.Mesh(new THREE.SphereGeometry(BR, 32, 20), ballMat); scene.add(ball);
-  const shadow = new THREE.Mesh(new THREE.CircleGeometry(BR, 16), new THREE.MeshBasicMaterial({color: 0x000000, transparent: true, opacity: .4}));
+  const ball = new THREE.Mesh(new THREE.SphereGeometry(BR * BIG, 32, 20), ballMat); scene.add(ball);
+  const shadow = new THREE.Mesh(new THREE.CircleGeometry(BR * BIG, 16), new THREE.MeshBasicMaterial({color: 0x000000, transparent: true, opacity: .4}));
   shadow.rotation.x = -Math.PI / 2; scene.add(shadow);
   const TRAIL = 14, trail = [], hist = [];
   for (let i = 0; i < TRAIL; i++) {
-    const m = new THREE.Mesh(new THREE.SphereGeometry(BR * (1 - i / TRAIL) * .8, 8, 6), new THREE.MeshBasicMaterial({transparent: true, opacity: .45 * (1 - i / TRAIL), depthWrite: false}));
+    const m = new THREE.Mesh(new THREE.SphereGeometry(BR * BIG * (1 - i / TRAIL) * .8, 8, 6), new THREE.MeshBasicMaterial({transparent: true, opacity: .45 * (1 - i / TRAIL), depthWrite: false}));
     scene.add(m); trail.push(m);
   }
   // penanda titik jatuh di meja lawan
@@ -139,7 +139,8 @@ export function createScene(cv) {
     const g = new THREE.Group();
     const blade = new THREE.Mesh(new THREE.CylinderGeometry(.078, .078, .013, 40), [mat(0x6b4a2b, {roughness: .7}), mat(0xdc2626, {roughness: .55}), mat(0x111111, {roughness: .5})]);
     blade.rotation.x = Math.PI / 2; blade.scale.x = .96; g.add(blade); // pusat bilah = pusat telapak, jadi derau sudut tidak menggeser bilah
-    const h = new THREE.Mesh(new THREE.BoxGeometry(.028, .1, .024), mat(0xd6a76a, {roughness: .6})); h.position.y = -.128; // ukuran umum: bilah 15,7 x 15 cm, tebal dengan karet 1,3 cm, gagang 10 cm g.add(h);
+    const h = new THREE.Mesh(new THREE.BoxGeometry(.028, .1, .024), mat(0xd6a76a, {roughness: .6})); h.position.y = -.128; // ukuran umum: bilah 15,7 x 15 cm, tebal dengan karet 1,3 cm, gagang 10 cm
+    g.add(h); g.scale.setScalar(BIG);
     g.userData.blade = blade; scene.add(g); return g;
   }
   const bats = {h: makeBat(), g: makeBat()};
@@ -319,7 +320,7 @@ export function createScene(cv) {
     // 6. kepala menatap bola
     c.head.lookAt(P.look.copy(ball));
   }
-  const grip = b => new THREE.Vector3(b.x - .13 * Math.sin(b.r), b.y - .13 * Math.cos(b.r) * Math.cos(b.p), b.z + .13 * Math.cos(b.r) * Math.sin(b.p)); // titik genggam di gagang
+  const GR = .13 * BIG, grip = b => new THREE.Vector3(b.x - GR * Math.sin(b.r), b.y - GR * Math.cos(b.r) * Math.cos(b.p), b.z + GR * Math.cos(b.r) * Math.sin(b.p)); // titik genggam di gagang
 
   // ---------- tingkat grafis ----------
   let cfg = GRAFIS.sedang, tex = null, envTex = null, composer = null, gtao = null, quality = '';
@@ -411,7 +412,7 @@ export function createScene(cv) {
       }
 
       const live = D.ph === 'serve' || D.ph === 'play';
-      ball.visible = live; ball.position.set(D.bx, D.by, D.bz);
+      ball.visible = live; ball.position.set(D.bx, D.by + BR * (BIG - 1), D.bz); // bola tergambar lebih besar tetap duduk di meja
       ballMat.emissive.setHex(D.w > .15 ? 0xff3d00 : D.w < -.15 ? 0x0066ff : 0xff7a00);
       const onTable = Math.abs(D.bx) < TW / 2 && Math.abs(D.bz) < TL / 2;
       shadow.visible = live && !cfg.shadow; shadow.position.set(D.bx, onTable ? TY + .003 : .012, D.bz);

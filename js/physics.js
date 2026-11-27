@@ -1,6 +1,6 @@
 // Fisika dan aturan permainan. Murni: tanpa DOM dan tanpa THREE, supaya bisa diuji dengan `node --test`.
 // Satuan meter. Meja panjang di sumbu z, net di z=0. Sisi 'h' (host/pemain) di z>0, sisi 'g' (tamu/komputer) di z<0.
-export const TL = 2.74, TW = 1.525, TY = .76, NET_TOP = TY + .1525, BR = .02, G = 9.8, HIT = .1; // ITTF: bola 40 mm; HIT = jari-jari bilah bat (sekitar 7,9 cm) + jari-jari bola: yang terlihat menyentuh bilah = kena
+export const TL = 2.74, TW = 1.525, TY = .76, NET_TOP = TY + .1525, BR = .02, G = 9.8, BIG = 1.25, HIT = .1 * BIG; // ITTF: bola 40 mm; bola dan bat digambar BIG kali ukuran asli agar mudah dilihat; HIT = jari-jari bilah + jari-jari bola yang tergambar: yang terlihat menyentuh bilah = kena
 export const EYE_Y = 1.55, EYE_Z = 2.6, LOOK_Y = .85, LOOK_Z = -.3, FOV = 65; // kamera pemain, diam; dipakai juga oleh pemetaan tangan
 export const SPIN_G = 5; // percepatan tegak tambahan per satuan spin: topspin (+1) menukik, backspin (-1) melayang
 export const SMASH_SPEED = 3.2; // m/s ayunan bat; di atas ini bola tinggi dipukul smash
