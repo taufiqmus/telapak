@@ -358,11 +358,13 @@ export function createScene(cv) {
         const hs = F.hands[k] === 'L' ? -1 : 1; // backhand = lengan menyilang badan
         P.look.set(live ? D.bx : 0, live ? D.by : TY + .2, live ? D.bz : -s * .5);
         poseChar(k, gp, hs, bh[k], e, P.look, D.ph === 'play', pdt);
-        // orang pertama: bahu tetap di bawah kamera; lengan bawah tetap panjangnya, hanya lengan atas (di luar layar) yang menyesuaikan
+        // orang pertama: panjang lengan tetap; bat jauh = bahu ikut maju ke arah bat (badan condong), lengan tidak meregang
         const fa = fpArm[k]; P.sh.set(ex + s * hs * .3, 1.15 + e.y, s * (EYE_Z - .05));
-        const ua = Math.max(UA, P.sh.distanceTo(gp) - FA * .95);
-        ik(P.sh, gp, ua, FA, P.pole.set(s * hs * .7, -1, s * .3), P.el, P.en);
-        bone(fa.a, P.sh, P.el); fa.a.scale.y = ua / UA; bone(fa.b, P.el, P.en); fa.palm.position.copy(P.en);
+        const far = P.sh.distanceTo(gp) - (UA + FA) * .97;
+        if (far > 0) P.sh.addScaledVector(tA.subVectors(gp, P.sh).normalize(), far);
+        ik(P.sh, gp, UA, FA, P.pole.set(s * hs * .7, -1, s * .3), P.el, P.en);
+        fa.a.visible = false; // gaya VR: hanya lengan bawah + telapak; pangkal lengan atas akan melayang di layar saat bat jauh
+        bone(fa.b, P.el, P.en); fa.palm.position.copy(P.en);
       }
 
       const post = cfg.post && composer && F.views.length === 1; // pasca-proses hanya di Ultra
