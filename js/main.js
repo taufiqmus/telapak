@@ -88,7 +88,7 @@ async function begin() { lockButtons(true); snd.audioInit(); if (await loadCam()
 
 // ---------- mulai mode ----------
 function startLocal(mode, prof, opp) {
-  role = 'cpu'; cpu = new Cpu(prof); S = newState(); S.mode = mode; S.nh = myName('Kamu'); S.ng = opp;
+  role = 'cpu'; cpu = new Cpu(prof); S = newState(); S.mode = mode; S.nh = myName('Kamu'); S.ng = opp; view.setLook('g', prof.id); // tiap lawan punya tokohnya sendiri
 }
 async function playLocal() { go('main'); await calibrate(); if (role) startRound(S, +$('win').value, +$('spd').value); }
 
@@ -166,7 +166,7 @@ $('duo').onclick = async () => {
   if ($('ctrl').value === 'mouse') { status('Mode berdua butuh kamera. Ganti kontrol ke Kamera di atas.'); return; }
   if (!await begin()) return;
   await setPeople(2);
-  role = 'duo'; trackers = [trackers[0], new Tracker()]; S = newState(); S.nh = myName('Kiri'); S.ng = 'Kanan';
+  role = 'duo'; trackers = [trackers[0], new Tracker()]; S = newState(); view.setLook('g', 'tamu'); S.nh = myName('Kiri'); S.ng = 'Kanan';
   go('main'); await calibrate(); if (role === 'duo') startRound(S, +$('win').value, +$('spd').value);
 };
 
@@ -206,7 +206,7 @@ function bothReady() { if (role === 'host' && myReady && oppReady) startRound(S,
 
 $('host').onclick = async () => {
   if (!await begin()) return;
-  role = 'host'; S = newState(); S.nh = myName('Pemain 1'); S.ng = 'Pemain 2'; status('Membuat room…');
+  role = 'host'; S = newState(); view.setLook('g', 'tamu'); S.nh = myName('Pemain 1'); S.ng = 'Pemain 2'; status('Membuat room…');
   openRoom($('broker').value, {
     onCode: code => { status('Room ' + code); $('kode').textContent = code; go('wait'); },
     onConn: async c => { bindConn(c); go('main'); await calibrate(); myReady = true; bothReady(); },
@@ -217,7 +217,7 @@ $('join').onclick = async () => {
   const code = $('code').value.trim();
   if (!/^\d{4}$/.test(code)) { status('Isi kode room 4 digit.'); return $('code').focus(); }
   if (!await begin()) return;
-  role = 'guest'; S = newState(); status('Menyambung ke room ' + code + '…');
+  role = 'guest'; S = newState(); view.setLook('g', 'tamu'); status('Menyambung ke room ' + code + '…');
   joinRoom($('broker').value, code, {
     onConn: async c => {
       bindConn(c); status('Terhubung.'); go('main'); await calibrate();

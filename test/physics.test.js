@@ -187,9 +187,9 @@ test('galat deterministik: masukan sama = lintasan sama (duel tidak berbeda anta
 
 test('servis menyerempet net lalu masuk = let, skor tetap; serempet lalu balik = net', () => {
   const S = newState(); startRound(S, 7, 1);
-  Object.assign(S, {ph: 'play', last: 'h', rally: 1, sv: true, sb: 1, bx: 0, by: NET_TOP + .01, bz: .05, vx: 0, vy: -.2, vz: -3, w: 0});
+  Object.assign(S, {ph: 'play', last: 'h', rally: 1, sv: true, sb: 1, bx: 0, by: NET_TOP + .0047 + .6 * BR, bz: .05, vx: 0, vy: -.2, vz: -3, w: 0}); // .0047 = turun sebelum sampai net: serempetan tipis di .6 BR
   run(S); assert.equal(S.why, 'let'); assert.equal(S.sl + S.sr, 0); assert.equal(S.lets, 1); assert.equal(S.cords, 1);
-  const R = newState(); Object.assign(R, {ph: 'play', last: 'h', rally: 3, bx: 0, by: NET_TOP - .005, bz: .02, vx: 0, vy: .24, vz: -.4, w: 0}); // serempetan tebal: balik
+  const R = newState(); Object.assign(R, {ph: 'play', last: 'h', rally: 3, bx: 0, by: NET_TOP - .1 * BR, bz: .02, vx: 0, vy: .24, vz: -.4, w: 0}); // serempetan tebal: balik
   run(R); assert.equal(R.cords, 1); assert.equal(R.why, 'net'); assert.equal(R.pw, 'g');
 });
 
@@ -222,7 +222,7 @@ test('sidespin: bola membelok tapi tetap mendarat, prediksi tamu ikut', () => {
 });
 
 test('fly sama dengan simulasi melewati serempetan net', () => {
-  const S = newState(); Object.assign(S, {ph: 'play', last: 'h', rally: 3, bx: 0, by: NET_TOP + .06, bz: .3, vx: .2, vy: .2, vz: -3, w: .2});
+  const S = newState(); Object.assign(S, {ph: 'play', last: 'h', rally: 3, bx: 0, by: NET_TOP + .034 + .5 * BR, bz: .3, vx: .2, vy: .2, vz: -3, w: .2});
   const B = guestKeys(S);
   for (let i = 0; i < 200 && S.bn === 0 && S.ph === 'play'; i++) { step(S, 1 / 120, blocked); fly(B, 1 / 120); }
   assert.equal(S.cords, 1); assert.ok(Math.abs(S.bz - B.bz) < 1e-9 && Math.abs(S.by - B.by) < 1e-9);

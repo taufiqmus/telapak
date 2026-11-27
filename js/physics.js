@@ -1,10 +1,10 @@
 // Fisika dan aturan permainan. Murni: tanpa DOM dan tanpa THREE, supaya bisa diuji dengan `node --test`.
 // Satuan meter. Meja panjang di sumbu z, net di z=0. Sisi 'h' (host/pemain) di z>0, sisi 'g' (tamu/komputer) di z<0.
-export const TL = 2.74, TW = 1.525, TY = .76, NET_TOP = TY + .1525, BR = .05, G = 9.8, HIT = .26;
+export const TL = 2.74, TW = 1.525, TY = .76, NET_TOP = TY + .1525, BR = .02, G = 9.8, HIT = .1; // ITTF: bola 40 mm; HIT = jari-jari bilah bat (sekitar 7,9 cm) + jari-jari bola: yang terlihat menyentuh bilah = kena
 export const EYE_Y = 1.55, EYE_Z = 2.6, LOOK_Y = .85, LOOK_Z = -.3, FOV = 65; // kamera pemain, diam; dipakai juga oleh pemetaan tangan
 export const SPIN_G = 5; // percepatan tegak tambahan per satuan spin: topspin (+1) menukik, backspin (-1) melayang
 export const SMASH_SPEED = 3.2; // m/s ayunan bat; di atas ini bola tinggi dipukul smash
-export const PROTO = 6;
+export const PROTO = 7;
 export const SIDE_G = 2.5; // m/s² belokan bola per satuan sidespin
 export const TOSS_Y = .95, TOSS_V = 2.6, SERVE_Z = 1.45; // lemparan servis: dari tinggi tangan, naik sekitar 35 cm, di belakang garis ujung
 export const EDGE = .015; // m: mendarat sedekat ini ke tepi meja = bola tepi (sah, memantul rendah) // versi protokol duel; naikkan bila isi paket berubah

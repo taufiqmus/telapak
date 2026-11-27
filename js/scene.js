@@ -28,7 +28,7 @@ const speckle = (g, w, h, n, a, light = 255) => { for (let i = 0; i < n; i++) { 
 function makeTextures() {
   return {
     // lantai lapangan karet (merah bata, sedikit berbintik)
-    court: canvasTex(512, 512, (g, w, h) => { g.fillStyle = '#8a2a23'; g.fillRect(0, 0, w, h); speckle(g, w, h, 9000, .07); speckle(g, w, h, 6000, .08, 0); }, [3, 4]),
+    court: canvasTex(512, 512, (g, w, h) => { g.fillStyle = '#8a2a23'; g.fillRect(0, 0, w, h); speckle(g, w, h, 9000, .07); speckle(g, w, h, 6000, .08, 0); }, [3.5, 7]),
     // lantai kayu di luar lapangan
     wood: canvasTex(512, 512, (g, w, h) => {
       const rows = 8, rh = h / rows;
@@ -78,12 +78,12 @@ export function createScene(cv) {
 
   // ruangan: lantai, matras, dinding, pembatas, lampu
   const floor = box(16, .02, 16, 0x5a1a1c, 0, -.01, 0);
-  const court = box(6, .01, 9, 0x8e2a24, 0, .005, 0);
+  const court = box(7, .01, 14, 0x8e2a24, 0, .005, 0); // area main ITTF minimal 14 x 7 m
   const room = new THREE.Mesh(new THREE.BoxGeometry(16, 6, 16), new THREE.MeshStandardMaterial({color: 0x2c3d5a, side: THREE.BackSide, roughness: 1}));
   room.position.y = 3; scene.add(room);
   const boards = [];
-  for (const x of [-3, 3]) boards.push(box(.05, .7, 9, 0x12305f, x, .35, 0));
-  for (const z of [-4.5, 4.5]) boards.push(box(6, .7, .05, 0x12305f, 0, .35, z));
+  for (const x of [-3.5, 3.5]) boards.push(box(.05, .75, 14, 0x12305f, x, .375, 0)); // pembatas 75 cm
+  for (const z of [-7, 7]) boards.push(box(7, .75, .05, 0x12305f, 0, .375, z));
   const lamps = [];
   for (const z of [-3, 0, 3]) lamps.push(box(2.5, .05, .3, 0xfff7d6, 0, 5.95, z, {emissive: 0xfff7d6, emissiveIntensity: 1}));
   // penonton di tribun samping: balok (cepat) atau orang sederhana (tingkat realistis)
@@ -106,11 +106,11 @@ export function createScene(cv) {
   const top = box(TW, .03, TL, 0x0b4a9e, 0, TY - .015, 0);
   for (const x of [-TW / 2 + .01, TW / 2 - .01]) box(.02, .002, TL, 0xffffff, x, TY + .001, 0);
   for (const z of [-TL / 2 + .01, TL / 2 - .01]) box(TW, .002, .02, 0xffffff, 0, TY + .001, z);
-  box(.01, .002, TL, 0xffffff, 0, TY + .001, 0);
+  box(.003, .002, TL, 0xffffff, 0, TY + .001, 0); // garis tengah 3 mm
   for (const x of [-TW / 2 + .1, TW / 2 - .1]) for (const z of [-TL / 2 + .2, TL / 2 - .2]) box(.06, TY - .03, .06, 0x1f2937, x, (TY - .03) / 2, z, {metalness: .6, roughness: .45});
-  const net = box(TW + .3, .1525, .004, 0xf1f5f9, 0, TY + .076, 0, {transparent: true, opacity: .55});
-  box(TW + .3, .014, .01, 0xffffff, 0, NET_TOP, 0);
-  for (const x of [-(TW / 2 + .15), TW / 2 + .15]) box(.025, .18, .025, 0x94a3b8, x, TY + .09, 0, {metalness: .7, roughness: .35});
+  const net = box(TW + .305, .1525, .004, 0xf1f5f9, 0, TY + .076, 0, {transparent: true, opacity: .55});
+  box(TW + .305, .014, .01, 0xffffff, 0, NET_TOP, 0); // net keluar 15,25 cm tiap sisi
+  for (const x of [-(TW / 2 + .1525), TW / 2 + .1525]) box(.025, .18, .025, 0x94a3b8, x, TY + .09, 0, {metalness: .7, roughness: .35});
 
   // bola + bayangan palsu (tingkat tanpa bayangan) + jejak
   const ballMat = mat(0xffa94d, {emissive: 0xff7a00, emissiveIntensity: .35});
@@ -137,9 +137,9 @@ export function createScene(cv) {
   // bat: bilah merah (karet) + sisi hitam + gagang kayu
   function makeBat() {
     const g = new THREE.Group();
-    const blade = new THREE.Mesh(new THREE.CylinderGeometry(.15, .15, .018, 40), [mat(0x6b4a2b, {roughness: .7}), mat(0xdc2626, {roughness: .55}), mat(0x111111, {roughness: .5})]);
-    blade.rotation.x = Math.PI / 2; g.add(blade); // pusat bilah = pusat telapak, jadi derau sudut tidak menggeser bilah
-    const h = new THREE.Mesh(new THREE.BoxGeometry(.035, .13, .024), mat(0xd6a76a, {roughness: .6})); h.position.y = -.2; g.add(h);
+    const blade = new THREE.Mesh(new THREE.CylinderGeometry(.078, .078, .013, 40), [mat(0x6b4a2b, {roughness: .7}), mat(0xdc2626, {roughness: .55}), mat(0x111111, {roughness: .5})]);
+    blade.rotation.x = Math.PI / 2; blade.scale.x = .96; g.add(blade); // pusat bilah = pusat telapak, jadi derau sudut tidak menggeser bilah
+    const h = new THREE.Mesh(new THREE.BoxGeometry(.028, .1, .024), mat(0xd6a76a, {roughness: .6})); h.position.y = -.128; // ukuran umum: bilah 15,7 x 15 cm, tebal dengan karet 1,3 cm, gagang 10 cm g.add(h);
     g.userData.blade = blade; scene.add(g); return g;
   }
   const bats = {h: makeBat(), g: makeBat()};
@@ -147,31 +147,112 @@ export function createScene(cv) {
   // karakter bersendi. Panjang tulang tetap: lengan dan kaki memakai IK dua tulang, jadi tidak pernah memanjang.
   // Bila bat di luar jangkauan, badan yang melangkah. Badan juga jongkok, condong, dan memutar pinggang-bahu mengikuti bat.
   // Sumbu lokal karakter: +z = ke depan (ke net), +x = kiri pemain, jadi bahu kanan di x negatif.
-  const KULIT = 0xf1c27d, UA = .29, FA = .31, TH = .45, SH = .45; // lengan atas, lengan bawah sampai gagang, paha, betis (m)
+  // Tiap tokoh dibuat dari ukuran badan standar 1,72 m lalu diskalakan: tinggi (m), badan (lebar relatif), pria/wanita, warna, rambut.
+  // rambut: cepak | pendek | jambul | kuncir | bob | botak (botak di atas, rambut di samping-belakang)
+  const LOOKS = {
+    pemain: {tinggi: 1.74, pria: true, kulit: 0xe0ac69, rambut: 'pendek', warnaRambut: 0x1a1410, kaus: COLOR.h, celana: 0x1e293b, sepatu: 0xf8fafc},
+    tamu: {tinggi: 1.72, pria: true, kulit: 0xc68642, rambut: 'cepak', warnaRambut: 0x111111, kaus: COLOR.g, celana: 0x111827, sepatu: 0x1f2937},
+    cepat: {tinggi: 1.75, pria: true, kulit: 0xd9a066, rambut: 'jambul', warnaRambut: 0x2b1d12, kaus: COLOR.g, celana: 0x111827, sepatu: 0xf8fafc, ikat: true},
+    mesin: {tinggi: 1.76, pria: true, kulit: 0xc68642, rambut: 'cepak', warnaRambut: 0x222222, kaus: 0x475569, celana: 0x1e293b, sepatu: 0x111827}, // pelatih di balik mesin bola
+    rina: {tinggi: 1.6, pria: false, kulit: 0xf1c27d, rambut: 'kuncir', warnaRambut: 0x2b1a10, kaus: 0x22c55e, celana: 0x111827, sepatu: 0xf8fafc},
+    bayu: {tinggi: 1.77, pria: true, badan: 1.05, kulit: 0x8d5524, rambut: 'cepak', warnaRambut: 0x0b0b0b, kaus: 0xf59e0b, celana: 0x1f2937, sepatu: 0xf8fafc, ikat: true},
+    dimas: {tinggi: 1.82, pria: true, badan: .9, kulit: 0xe0ac69, rambut: 'jambul', warnaRambut: 0x3b2314, kaus: 0xeab308, celana: 0x0f172a, sepatu: 0x2563eb},
+    sari: {tinggi: 1.64, pria: false, kulit: 0xc68642, rambut: 'bob', warnaRambut: 0x111111, kaus: 0xec4899, celana: 0x1e1b4b, sepatu: 0xf8fafc},
+    juara: {tinggi: 1.7, pria: true, badan: 1.14, kulit: 0xd9a066, rambut: 'botak', warnaRambut: 0xb8b8b8, kaus: 0xdc2626, celana: 0x111111, sepatu: 0x111111, kumis: true}
+  };
   const V3 = () => new THREE.Vector3();
-  const capsule = (r, len, c, o) => new THREE.Mesh(new THREE.CapsuleGeometry(r, Math.max(.01, len - 2 * r), 4, 10), mat(c, o));
-  function makeLimbs(g, a, b, r1, r2, c1, c2) { const m = {a: capsule(r1, a, c1), b: capsule(r2, b, c2)}; g.add(m.a, m.b); return m; }
-  function makeChar(shirt) {
-    const g = new THREE.Group(), root = new THREE.Group(), spine = new THREE.Group(), head = new THREE.Group();
-    g.add(root); root.add(spine);
-    const pelvis = capsule(.12, .34, 0x222a44); pelvis.rotation.z = Math.PI / 2; root.add(pelvis); // celana
-    const torso = capsule(.18, .48, shirt, {roughness: .85}); torso.position.y = .27; torso.scale.z = .62; spine.add(torso);
-    const neck = new THREE.Mesh(new THREE.CylinderGeometry(.05, .06, .1, 10), mat(KULIT)); neck.position.y = .53; spine.add(neck);
-    head.position.y = .66; spine.add(head);
-    head.add(new THREE.Mesh(new THREE.SphereGeometry(.115, 20, 14), mat(KULIT, {roughness: .6})));
-    const band = new THREE.Mesh(new THREE.TorusGeometry(.113, .018, 8, 24), mat(0xffffff)); band.position.y = .05; band.rotation.x = Math.PI / 2; head.add(band); // ikat kepala
-    const nose = new THREE.Mesh(new THREE.SphereGeometry(.022, 8, 6), mat(KULIT)); nose.position.set(0, -.01, .11); head.add(nose); // arah pandang terlihat
-    const sh = {R: new THREE.Object3D(), L: new THREE.Object3D()}; sh.R.position.set(-.2, .46, 0); sh.L.position.set(.2, .46, 0); spine.add(sh.R, sh.L);
-    const arms = {R: makeLimbs(g, UA, FA, .045, .04, shirt, KULIT), L: makeLimbs(g, UA, FA, .045, .04, shirt, KULIT)}; // lengan atas berlengan baju
-    const palms = {R: new THREE.Mesh(new THREE.SphereGeometry(.042, 10, 8), mat(KULIT)), L: new THREE.Mesh(new THREE.SphereGeometry(.042, 10, 8), mat(KULIT))}; g.add(palms.R, palms.L);
-    const legs = {R: makeLimbs(g, TH, SH, .07, .055, 0x222a44, KULIT), L: makeLimbs(g, TH, SH, .07, .055, 0x222a44, KULIT)};
-    const shoes = {R: new THREE.Mesh(new THREE.BoxGeometry(.11, .07, .26), mat(0xf7f9fc, {roughness: .6})), L: new THREE.Mesh(new THREE.BoxGeometry(.11, .07, .26), mat(0xf7f9fc, {roughness: .6}))}; g.add(shoes.R, shoes.L);
-    scene.add(g);
-    return {g, root, spine, head, pelvis, sh, arms, palms, legs, shoes, st: null};
+  // Ruas tubuh: Group dengan sumbu y sepanjang tulang, dari -len/2 (pangkal) ke +len/2 (ujung), sesuai bone().
+  // parts: [dari, sampai (pecahan panjang), jari-jari pangkal, jari-jari ujung, material]; tiap bagian diberi sendi bulat di pangkalnya.
+  function segment(len, parts) {
+    const g = new THREE.Group();
+    for (const [a, b, r0, r1, m] of parts) {
+      const c = new THREE.Mesh(new THREE.CylinderGeometry(r1, r0, (b - a) * len, 14), m); c.position.y = ((a + b) / 2 - .5) * len; g.add(c);
+      const j = new THREE.Mesh(new THREE.SphereGeometry(r0, 14, 10), m); j.position.y = (a - .5) * len; g.add(j);
+    }
+    return g;
   }
-  const chars = {h: makeChar(COLOR.h), g: makeChar(COLOR.g)};
-  const fpArm = {}; // lengan orang pertama: lengan bawah tetap panjangnya, lengan atas sebagian besar di luar layar
-  for (const k of ['h', 'g']) { const g = new THREE.Group(); fpArm[k] = {g, ...makeLimbs(g, UA, FA, .05, .045, COLOR[k], KULIT), palm: new THREE.Mesh(new THREE.SphereGeometry(.045, 10, 8), mat(KULIT))}; g.add(fpArm[k].palm); scene.add(g); }
+  // lengan bawah sampai titik genggam: lengan, pergelangan, telapak, jempol
+  function forearm(len, skin) {
+    const g = segment(len, [[0, .78, .036, .026, skin]]);
+    const palm = new THREE.Mesh(new THREE.SphereGeometry(.04, 12, 10), skin); palm.scale.set(.8, 1.15, .5); palm.position.y = .4 * len; g.add(palm);
+    const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(.011, .035, 4, 8), skin); thumb.position.set(-.022, .36 * len, .015); thumb.rotation.z = .6; g.add(thumb);
+    return g;
+  }
+  function makeChar(L) {
+    const u = L.tinggi / 1.72, b = L.badan || 1, f = !L.pria, bw = b * (f ? .9 : 1);
+    const mats = {}, M = (c, r = .8) => mats[c + '/' + r] || (mats[c + '/' + r] = mat(c, {roughness: r}));
+    const skin = M(L.kulit, .6), shirt = M(L.kaus, .85), shorts = M(L.celana, .85), hairM = M(L.warnaRambut, .95), white = M(0xffffff, .7);
+    const d = {ua: .3 * u, fa: .31 * u, th: .47 * u, sh: .47 * u, hip: .89 * u, hipx: (f ? .1 : .095) * b * u, stance: .23 * u, u};
+    const g = new THREE.Group(), root = new THREE.Group(), spine = new THREE.Group(), head = new THREE.Group();
+    g.add(root); root.add(spine); spine.scale.setScalar(u);
+    const add = (p, geo, m, x = 0, y = 0, z = 0) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); p.add(o); return o; };
+    const lathe = pts => new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), 28);
+    // badan berprofil: pria dada lebar, wanita pinggang ramping dan pinggul lebih lebar
+    const torso = add(spine, lathe(f
+      ? [[.001, -.02], [.145, -.01], [.15, .06], [.12, .18], [.135, .3], [.148, .38], [.15, .44], [.13, .5], [.065, .53], [.001, .535]]
+      : [[.001, -.02], [.13, -.01], [.14, .08], [.135, .18], [.15, .3], [.168, .4], [.17, .46], [.14, .51], [.07, .545], [.001, .55]]), shirt);
+    torso.scale.set(b, 1, .62 * b);
+    const collar = add(spine, new THREE.TorusGeometry(.058, .011, 8, 24), white, 0, .535); collar.rotation.x = Math.PI / 2; collar.scale.set(1, .8, 1);
+    add(spine, new THREE.CylinderGeometry(.043, .05, .11, 14), skin, 0, .57); // leher
+    // celana pendek di pinggul (ikut root, tidak ikut putaran bahu)
+    const pelvis = new THREE.Group(); root.add(pelvis); pelvis.scale.set(u * b * (f ? 1.05 : 1), u, u * b);
+    add(pelvis, lathe([[.001, -.13], [.12, -.14], [.155, -.06], [.155, .03], [.14, .08], [.001, .08]]), shorts).scale.z = .68;
+    // kepala: bulat telur, wajah menghadap +z
+    head.position.y = .7; spine.add(head);
+    add(head, new THREE.SphereGeometry(.1, 28, 20), skin).scale.set(.88, 1.08, .98);
+    for (const x of [-.032, .032]) {
+      add(head, new THREE.SphereGeometry(.013, 12, 8), white, x, .012, .083);
+      add(head, new THREE.SphereGeometry(.0075, 10, 6), M(0x2a1a10), x, .012, .094);
+      add(head, new THREE.BoxGeometry(.03, .006, .008), hairM, x, .035, .09).rotation.z = x > 0 ? -.12 : .12; // alis
+      add(head, new THREE.SphereGeometry(.022, 10, 8), skin, x * 2.75, 0, 0).scale.set(.45, 1, .7); // telinga
+    }
+    add(head, new THREE.SphereGeometry(.017, 10, 8), skin, 0, -.012, .098).scale.set(.85, 1.25, 1); // hidung
+    add(head, new THREE.BoxGeometry(.032, .006, .006), M(0x9a4a4a, .6), 0, -.047, .088); // mulut
+    if (L.kumis) add(head, new THREE.BoxGeometry(.046, .01, .01), hairM, 0, -.033, .093);
+    // rambut: tudung setengah bola dimiringkan ke belakang supaya dahi terlihat
+    const cap = (r, th, tilt = -.35) => { const m = add(head, new THREE.SphereGeometry(r, 24, 12, 0, Math.PI * 2, 0, th), hairM, 0, .012, -.005); m.scale.set(.9, 1.1, 1); m.rotation.x = tilt; return m; };
+    if (L.rambut === 'cepak') cap(.102, Math.PI * .5);
+    if (L.rambut === 'pendek' || L.rambut === 'jambul' || L.rambut === 'kuncir' || L.rambut === 'bob') cap(.106, Math.PI * .53);
+    if (L.rambut === 'jambul') { const m = add(head, new THREE.SphereGeometry(.05, 14, 10), hairM, 0, .1, .04); m.scale.set(1.25, .6, 1); m.rotation.x = -.5; }
+    if (L.rambut === 'kuncir') {
+      add(head, new THREE.SphereGeometry(.03, 12, 8), hairM, 0, .045, -.105);
+      const t = add(head, new THREE.CapsuleGeometry(.026, .13, 4, 10), hairM, 0, -.03, -.13); t.rotation.x = .35;
+    }
+    if (L.rambut === 'bob') { const m = add(head, new THREE.SphereGeometry(.112, 24, 14, Math.PI * .75, Math.PI * 1.5, 0, Math.PI * .7), hairM); m.scale.set(.92, 1.1, 1.02); } // terbuka di depan wajah
+    if (L.rambut === 'botak') add(head, new THREE.SphereGeometry(.104, 24, 8, Math.PI, Math.PI, Math.PI * .4, Math.PI * .22), hairM).scale.set(.9, 1.08, 1); // samping-belakang saja
+    if (L.ikat) { const m = add(head, new THREE.TorusGeometry(.094, .011, 8, 28), white, 0, .045, 0); m.rotation.x = Math.PI / 2 - .2; m.scale.set(.93, 1.04, 1); }
+    // bahu: lebar badan; lengan atas berlengan kaus, lengan bawah + telapak
+    const sh = {R: new THREE.Object3D(), L: new THREE.Object3D()}, sx = (f ? .18 : .2) * b;
+    sh.R.position.set(-sx, .49, 0); sh.L.position.set(sx, .49, 0); spine.add(sh.R, sh.L);
+    const limb = s => { s.scale.set(u * bw, u, u * bw); g.add(s); return s; };
+    const arms = {}, legs = {}, shoes = {};
+    for (const n of ['R', 'L']) {
+      arms[n] = {a: limb(segment(.3, [[0, .42, .05, .047, shirt], [.42, 1, .04, .034, skin]])), b: limb(forearm(.31, skin))};
+      legs[n] = {a: limb(segment(.47, [[0, .55, .088, .074, shorts], [.5, 1, .068, .05, skin]])), b: limb(segment(.47, [[0, .35, .05, .056, skin], [.35, .86, .056, .032, skin], [.86, 1, .036, .034, white]]))};
+      // sepatu: badan sepatu membulat + sol putih; titik asal = pergelangan kaki di lantai
+      const s = new THREE.Group(); s.scale.setScalar(u); g.add(s); shoes[n] = s;
+      add(s, new THREE.BoxGeometry(.095, .025, .27), white, 0, .012, .03);
+      const top = add(s, new THREE.CapsuleGeometry(.045, .17, 4, 12), M(L.sepatu, .6), 0, .04, .03); top.rotation.x = Math.PI / 2; top.scale.set(1, 1, .7);
+    }
+    scene.add(g);
+    g.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; o.material.envMapIntensity = .45; } });
+    return {g, root, spine, head, pelvis, sh, arms, legs, shoes, d, st: null};
+  }
+  // lengan orang pertama: hanya lengan bawah + telapak (gaya VR)
+  function makeFp(L) {
+    const u = L.tinggi / 1.72, g = new THREE.Group(), b = forearm(.31, mat(L.kulit, {roughness: .6}));
+    b.scale.set(u * 1.1, u, u * 1.1); g.add(b); scene.add(g);
+    return {g, b, ua: .3 * u, fa: .31 * u};
+  }
+  const chars = {}, fpArm = {}, lookId = {};
+  const drop = o => { scene.remove(o); o.traverse(m => { if (m.isMesh) { m.geometry.dispose(); m.material.dispose(); } }); };
+  function setLook(k, id) {
+    if (!LOOKS[id]) id = k === 'h' ? 'pemain' : 'tamu';
+    if (lookId[k] === id) return;
+    if (chars[k]) { drop(chars[k].g); drop(fpArm[k].g); }
+    lookId[k] = id; chars[k] = makeChar(LOOKS[id]); fpArm[k] = makeFp(LOOKS[id]);
+  }
+  setLook('h', 'pemain'); setLook('g', 'tamu');
 
   const up = new THREE.Vector3(0, 1, 0), tA = V3(), tD = V3(), tN = V3();
   // IK dua tulang: dari sendi A ke target T, sendi tengah J ditekuk ke arah pole. E = ujung (= T bila terjangkau).
@@ -189,8 +270,8 @@ export function createScene(cv) {
 
   // Satu frame gerak karakter sisi k. hand = titik gagang (target tangan), isBh = backhand, ball = titik yang ditatap.
   function poseChar(k, hand, hs, isBh, e, ball, play, dt) {
-    const c = chars[k], s = k === 'h' ? 1 : -1, base = k === 'h' ? Math.PI : 0;
-    const st = c.st || (c.st = {x: hand.x, z: s * (TL / 2 + .8), vx: 0, vz: 0, ph: 0, lean: .3, yaw: 0, hip: .84});
+    const c = chars[k], d = c.d, s = k === 'h' ? 1 : -1, base = k === 'h' ? Math.PI : 0;
+    const st = c.st || (c.st = {x: hand.x, z: s * (TL / 2 + .8), vx: 0, vz: 0, ph: 0, lean: .3, yaw: 0, hip: d.hip});
     // 1. kaki: badan mengejar titik di belakang bat (pegas teredam kritis = langkah dengan sedikit lambat, seperti footwork)
     const tx = hand.x - s * hs * (isBh ? -.08 : .3), tz = s * clamp(s * hand.z + .5, TL / 2 + .28, TL / 2 + 1.3), w = 8;
     st.vx += (w * w * (tx - st.x) - 2 * w * st.vx) * dt; st.vz += (w * w * (tz - st.z) - 2 * w * st.vz) * dt;
@@ -198,7 +279,7 @@ export function createScene(cv) {
     // 2. badan: jongkok untuk bola rendah, condong saat menjangkau, putar pinggang-bahu ke arah bat
     const rx = (hand.x - st.x) * s, fz = -(hand.z - st.z) * s; // bat relatif badan: kanan pemain, ke depan
     const low = clamp((1 - hand.y) / .4), far = clamp((fz - .3) / .5), bob = play ? .012 * Math.sin(performance.now() / 110) : 0;
-    st.hip += (.84 - .1 * low + Math.min(0, e.y) * .6 + bob - st.hip) * ease(dt, 10);
+    st.hip += (d.hip - .1 * d.u * low + Math.min(0, e.y) * .6 + bob - st.hip) * ease(dt, 10);
     st.lean += (.2 + .4 * far + .25 * low - st.lean) * ease(dt, 10);
     st.yaw += (clamp(-Math.atan2(rx, Math.max(.1, fz)) * .75, -1, 1) - st.yaw) * ease(dt, 18); // + = putar ke kiri pemain
     c.root.position.set(st.x, 0, st.z); c.root.rotation.y = base + st.yaw * .4;
@@ -208,37 +289,37 @@ export function createScene(cv) {
     // 3. lengan pemukul: bat di luar jangkauan = badan digeser sampai tangan sampai, jadi lengan tidak meregang
     const hn = hs === 1 ? 'R' : 'L', fn = hs === 1 ? 'L' : 'R';
     c.sh[hn].getWorldPosition(P.sh);
-    const dx = hand.x - P.sh.x, dy = hand.y - P.sh.y, dz = hand.z - P.sh.z, hz = Math.hypot(dx, dz) || 1e-6, max = (UA + FA) * .97;
+    const dx = hand.x - P.sh.x, dy = hand.y - P.sh.y, dz = hand.z - P.sh.z, hz = Math.hypot(dx, dz) || 1e-6, max = (d.ua + d.fa) * .97;
     if (Math.hypot(hz, dy) > max) {
       const m = hz - Math.sqrt(Math.max(0, max * max - dy * dy));
       st.x += dx / hz * m; st.z += dz / hz * m; c.root.position.set(st.x, 0, st.z); c.root.updateMatrixWorld(true); c.sh[hn].getWorldPosition(P.sh);
     }
     P.pole.set(s * hs * (isBh ? .8 : .7), isBh ? -.6 : -1, s * (isBh ? -.5 : .3)); // siku turun-keluar; backhand: siku ke depan-keluar
-    ik(P.sh, hand, UA, FA, P.pole, P.el, P.en);
-    bone(c.arms[hn].a, P.sh, P.el); bone(c.arms[hn].b, P.el, P.en); c.palms[hn].position.copy(P.en);
+    ik(P.sh, hand, d.ua, d.fa, P.pole, P.el, P.en);
+    bone(c.arms[hn].a, P.sh, P.el); bone(c.arms[hn].b, P.el, P.en);
     // 4. lengan bebas: ditekuk di depan perut, ikut putaran badan sebagai penyeimbang
     c.sh[fn].getWorldPosition(P.sh);
     c.spine.localToWorld(P.tgt.set(hs * .17, .14, .3));
     P.pole.set(-s * hs * .6, -1, s * .4);
-    ik(P.sh, P.tgt, UA, FA * .85, P.pole, P.el, P.en);
-    bone(c.arms[fn].a, P.sh, P.el); bone(c.arms[fn].b, P.el, P.en); c.palms[fn].position.copy(P.en);
+    ik(P.sh, P.tgt, d.ua, d.fa, P.pole, P.el, P.en);
+    bone(c.arms[fn].a, P.sh, P.el); bone(c.arms[fn].b, P.el, P.en);
     // 5. kaki: kuda-kuda lebar, kaki sisi pemukul sedikit di belakang; melangkah bergantian saat badan bergerak
     const sp = Math.hypot(st.vx, st.vz), ux = sp > 1e-3 ? st.vx / sp : 0, uz = sp > 1e-3 ? st.vz / sp : 0;
     st.ph += Math.min(sp, 3) * dt * 13;
     const stride = Math.min(.14, sp * .2), lift = .06 * clamp(sp / .5);
     for (const [n, side] of [['R', 1], ['L', -1]]) {
       const q = st.ph + (side === 1 ? 0 : Math.PI);
-      c.root.localToWorld(P.hip.set(-side * .1, st.hip - .04, 0));
-      P.an.set(st.x + s * side * .23 + ux * stride * Math.cos(q), .07 + lift * Math.max(0, Math.sin(q)), st.z + s * (side === hs ? .1 : -.06) + uz * stride * Math.cos(q));
+      c.root.localToWorld(P.hip.set(-side * d.hipx, st.hip - .04 * d.u, 0));
+      P.an.set(st.x + s * side * d.stance + ux * stride * Math.cos(q), .07 * d.u + lift * Math.max(0, Math.sin(q)), st.z + s * (side === hs ? .1 : -.06) + uz * stride * Math.cos(q));
       P.pole.set(s * side * .3, 0, -s);
-      ik(P.hip, P.an, TH, SH, P.pole, P.kn, P.en);
+      ik(P.hip, P.an, d.th, d.sh, P.pole, P.kn, P.en);
       bone(c.legs[n].a, P.hip, P.kn); bone(c.legs[n].b, P.kn, P.en);
-      c.shoes[n].position.set(P.en.x, P.en.y - .035, P.en.z - s * .05); c.shoes[n].rotation.y = base;
+      c.shoes[n].position.set(P.en.x, 0, P.en.z - s * .03); c.shoes[n].rotation.y = base;
     }
     // 6. kepala menatap bola
     c.head.lookAt(P.look.copy(ball));
   }
-  const grip = b => new THREE.Vector3(b.x - .21 * Math.sin(b.r), b.y - .21 * Math.cos(b.r) * Math.cos(b.p), b.z + .21 * Math.cos(b.r) * Math.sin(b.p)); // titik genggam di gagang
+  const grip = b => new THREE.Vector3(b.x - .13 * Math.sin(b.r), b.y - .13 * Math.cos(b.r) * Math.cos(b.p), b.z + .13 * Math.cos(b.r) * Math.sin(b.p)); // titik genggam di gagang
 
   // ---------- tingkat grafis ----------
   let cfg = GRAFIS.sedang, tex = null, envTex = null, composer = null, gtao = null, quality = '';
@@ -302,6 +383,7 @@ export function createScene(cv) {
   const bh = {h: false, g: false}; // forehand/backhand per sisi; disimpan di sini supaya tayangan ulang juga benar
   const api = {
     setQuality,
+    setLook, // setLook(sisi, id tokoh): pemain, tamu, cepat, mesin, rina, bayu, dimas, sari, juara
     get quality() { return quality; },
     burst(p, color, n = 16, speed = 1.6) {
       let k = 0;
@@ -360,11 +442,10 @@ export function createScene(cv) {
         poseChar(k, gp, hs, bh[k], e, P.look, D.ph === 'play', pdt);
         // orang pertama: panjang lengan tetap; bat jauh = bahu ikut maju ke arah bat (badan condong), lengan tidak meregang
         const fa = fpArm[k]; P.sh.set(ex + s * hs * .3, 1.15 + e.y, s * (EYE_Z - .05));
-        const far = P.sh.distanceTo(gp) - (UA + FA) * .97;
+        const far = P.sh.distanceTo(gp) - (fa.ua + fa.fa) * .97;
         if (far > 0) P.sh.addScaledVector(tA.subVectors(gp, P.sh).normalize(), far);
-        ik(P.sh, gp, UA, FA, P.pole.set(s * hs * .7, -1, s * .3), P.el, P.en);
-        fa.a.visible = false; // gaya VR: hanya lengan bawah + telapak; pangkal lengan atas akan melayang di layar saat bat jauh
-        bone(fa.b, P.el, P.en); fa.palm.position.copy(P.en);
+        ik(P.sh, gp, fa.ua, fa.fa, P.pole.set(s * hs * .7, -1, s * .3), P.el, P.en);
+        bone(fa.b, P.el, P.en); // gaya VR: hanya lengan bawah + telapak; pangkal lengan atas akan melayang di layar saat bat jauh
       }
 
       const post = cfg.post && composer && F.views.length === 1; // pasca-proses hanya di Ultra
