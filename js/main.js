@@ -534,7 +534,7 @@ function tick(now) {
   readPose(vid, trackers, {hand: $('hand').value, hand2: [$('hand').value, $('hand').value], smooth: +$('smooth').value, pitch: $('pitch').checked, head: headOn()});
 
   // nilai tangan tiap sisi lokal, dikejar tiap frame layar
-  const kf = 1 - Math.exp(-60 * dt);
+  const kf = 1 - Math.exp(-(!duo && mouseCtl() ? 60 : 200) * dt); // kamera sudah dihaluskan One Euro: kejaran cepat, hanya meratakan 42 Hz pose ke frame layar
   const src = duo ? {h: trackers[0].fil, g: trackers[1].fil} : {[ownSide()]: mouseCtl() ? mouse : trackers[0].fil};
   const head = !headOn() ? {} : duo ? {h: trackers[0].head, g: trackers[1].head} : {[ownSide()]: trackers[0].head};
   const own = {}, eye = {};
@@ -565,7 +565,14 @@ function tick(now) {
         if (side === ownSide() || duo) { if (!duo) { onMyHit(S, smash); store.logShot({hit: 1, d: +r.d.toFixed(3), along: +r.along.toFixed(3), cause: S.cause, w: +S.w.toFixed(2), bh: +backhand(side, batOf(S, side).x, myHand()), p: +batOf(S, side).p.toFixed(2)}); } if (side === 'h') tutHit(); }
       }
     });
-    if (S.hits !== hits) hitstop = reduced.matches || net() ? 0 : S.smashes > fx.smashes ? .12 : .045; // duel: tanpa hitstop, prediksi bola tamu tidak mengenalnya
+    if (REKAM && !duo) { // ?rekam: rekaman per frame untuk menganalisa gerakan bat; baca dengan telapakRekam di konsol
+      const me = ownSide(), t = trackers[0], b = batOf(S, me), r = v => v == null ? null : +v.toFixed(4);
+      REKAM.push({t: r(now), dt: r(dt), pf: poseStat.frames, palm: t.palm ? 1 : 0, raw: t.raw && [r(t.raw.x), r(t.raw.y), r(t.raw.z)],
+        fil: [r(t.fil.x), r(t.fil.y), r(t.fil.z), r(t.fil.r), r(t.fil.p)], bat: [r(b.x), r(b.y), r(b.z), r(b.r), r(b.p)], sw: [r(sp[me].s), r(sp[me].vx), r(sp[me].vy)],
+        ball: [r(S.bx), r(S.by), r(S.bz)], eye: [r(S[me + 'ex']), r(S[me + 'ey'])], ph: S.ph, bn: S.bn, last: S.last, hit: S.hits !== hits ? S.last : 0, pt: before === 'play' && S.ph === 'point' ? S.why + ':' + S.pw : 0});
+      if (REKAM.length > 30000) REKAM.shift();
+    }
+    if (S.hits !== hits) hitstop =reduced.matches || net() ? 0 : S.smashes > fx.smashes ? .12 : .045; // duel: tanpa hitstop, prediksi bola tamu tidak mengenalnya
     if (before === 'play') rec.push({D: snapBall(), bats: {h: batOf(S, 'h'), g: batOf(S, 'g')}, dt});
     while (rec.length > 200) rec.shift();
     if (before === 'play' && S.ph === 'point') {
@@ -639,7 +646,8 @@ function drawPip() {
 }
 
 // Ekspor catatan near-miss untuk menyetel hitbox: ketik telapakLog() di konsol.
-window.telapakLog = () => { const L = store.readLog(); console.table(L.slice(-20)); return JSON.stringify(L); };
+const REKAM = new URLSearchParams(location.search).has('rekam') ? (window.telapakRekam = []) : null;
+window.telapakLog =() => { const L = store.readLog(); console.table(L.slice(-20)); return JSON.stringify(L); };
 if (new URLSearchParams(location.search).has('debug')) window.__telapak = {get S() { return S; }, get replay() { return replay; }, prog}; // untuk uji otomatis
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { /* tanpa offline pun game tetap jalan */ });
 // tingkat grafis: berlaku langsung, tersimpan di laptop ini

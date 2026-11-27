@@ -7,17 +7,17 @@ const MODEL = acc => `https://storage.googleapis.com/mediapipe-models/pose_landm
 
 // One Euro Filter: halus saat tangan pelan, responsif saat cepat (https://gery.casiez.net/1euro/)
 class OneEuro {
-  constructor(beta) { this.b = beta; this.x = null; this.dx = 0; this.t = 0; }
+  constructor(beta, dcut = 1) { this.b = beta; this.dc = dcut; this.x = null; this.dx = 0; this.t = 0; }
   static a(cut, dt) { return 1 / (1 + 1 / (2 * Math.PI * cut) / dt); }
   f(v, t, minCut) {
     if (this.x === null) { this.x = v; this.t = t; return v; }
     const dt = Math.max((t - this.t) / 1000, 1e-3); this.t = t;
-    this.dx += ((v - this.x) / dt - this.dx) * OneEuro.a(1, dt);
+    this.dx += ((v - this.x) / dt - this.dx) * OneEuro.a(this.dc, dt);
     this.x += (v - this.x) * OneEuro.a(minCut + this.b * Math.abs(this.dx), dt);
     return this.x;
   }
 }
-const MINCUT_SCALE = {x: 1, y: 1, z: .3, r: .8, p: .5}; // z paling berisik
+const MINCUT_SCALE = {x: .32, y: .32, z: .3, r: .8, p: .5}; // z paling berisik; x, y: lebih halus saat tangan diam (filter tetap cepat terbuka saat mengayun)
 const wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
 const dz = (v, d) => Math.abs(v) < d ? 0 : v - Math.sign(v) * d; // zona mati: getaran kecil di sekitar netral diabaikan
 // titik telapak pada pose: pergelangan, kelingking, telunjuk, jempol (kiri 15,17,19,21 / kanan 16,18,20,22)
@@ -27,7 +27,8 @@ const PALM = {L: [15, 17, 19, 21], R: [16, 18, 20, 22]};
 export class Tracker {
   constructor() {
     // beta kecil untuk sumbu berisik (z, roll, pitch): turunan derau yang besar jangan sampai membuka filter
-    this.filt = {x: new OneEuro(8), y: new OneEuro(8), z: new OneEuro(1.5), r: new OneEuro(.8), p: new OneEuro(.6)};
+    this.filt = {x: new OneEuro(8, 5), y: new OneEuro(8, 5), // x, y: turunan dipotong 5 Hz supaya filter terbuka di awal ayunan (dari rekaman ?rekam: galat saat mengayun turun sekitar 64%, getar diam turun 11%)
+       z: new OneEuro(1.5), r: new OneEuro(.8), p: new OneEuro(.6)};
     this.hist = {z: [], r: [], p: []}; // median 3 sampel: membuang lonjakan 1 frame sebelum masuk filter
     this.fil = {x: 0, y: .5, z: .5, r: 0, p: 0}; // keluaran filter; x:-1..1 (kanan layar), y:0..1 (atas), z:0..1 (maju ke net), r:-1..1 (miring)
     this.hand = 'R'; this.pick = false; this.palm = null; this.lastSeen = 0;
