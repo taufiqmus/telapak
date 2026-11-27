@@ -102,7 +102,7 @@ export class Tracker {
     const mc = 3 * Math.pow(.1, o.smooth); // 0 -> 3 Hz (responsif), 1 -> 0.3 Hz (halus)
     this.raw = {x: sx, y: sy, z: zRaw};
     const R = o.solo && this.range || {}; // duel satu kamera: tiap orang separuh gambar, pakai rentang bawaan
-    const raw = {x: R.x ? seg(sx, R.x) * 2 - 1 : clamp((sx - o.a) / (o.b - o.a)) * 2 - 1, y: R.y ? 1 - seg(sy, R.y) : 1 - clamp((sy - .15) / .7),
+    const raw = {x: R.x ? seg(sx, R.x) * 2 - 1 : clamp((sx - o.a) / (o.b - o.a)) * 2 - 1, y: R.y ? 1 - seg(sy, R.y) + clamp(.5 * (R.y[0] - sy) / (R.y[1] - R.y[0]), 0, .5) : 1 - clamp((sy - .15) / .7, -.5, 1), // tangan di atas batas kalibrasi tetap menaikkan bat (sampai 1,5) untuk menjangkau pantulan lob
       z: R.z ? 1 - seg(zRaw, R.z) : clamp(.5 + (this.zBase - zRaw) * 1.7), // 1,7 / m: jangkauan lengan sekitar +-0,3 m
       r: clamp(dz(wrap(rawR - this.rBase), .06), -1, 1), p: !o.pitch ? 0 : clamp(dz(this.rawP - this.pBase, .06) * .8, -.6, .6)}; // bat: roll dan pitch relatif terhadap netral
     for (const k in raw) this.fil[k] = this.filt[k].f(k in this.hist ? this.med3(k, raw[k]) : raw[k], now, mc * MINCUT_SCALE[k]);
