@@ -144,32 +144,101 @@ export function createScene(cv) {
   }
   const bats = {h: makeBat(), g: makeBat()};
 
-  // karakter: badan kapsul + satu lengan yang direntangkan ke bat
+  // karakter bersendi. Panjang tulang tetap: lengan dan kaki memakai IK dua tulang, jadi tidak pernah memanjang.
+  // Bila bat di luar jangkauan, badan yang melangkah. Badan juga jongkok, condong, dan memutar pinggang-bahu mengikuti bat.
+  // Sumbu lokal karakter: +z = ke depan (ke net), +x = kiri pemain, jadi bahu kanan di x negatif.
+  const KULIT = 0xf1c27d, UA = .29, FA = .31, TH = .45, SH = .45; // lengan atas, lengan bawah sampai gagang, paha, betis (m)
+  const V3 = () => new THREE.Vector3();
+  const capsule = (r, len, c, o) => new THREE.Mesh(new THREE.CapsuleGeometry(r, Math.max(.01, len - 2 * r), 4, 10), mat(c, o));
+  function makeLimbs(g, a, b, r1, r2, c1, c2) { const m = {a: capsule(r1, a, c1), b: capsule(r2, b, c2)}; g.add(m.a, m.b); return m; }
   function makeChar(shirt) {
-    const g = new THREE.Group(), skin = 0xf1c27d;
-    const part = (geo, c, x, y, o) => { const m = new THREE.Mesh(geo, mat(c, o)); m.position.set(x, y, 0); g.add(m); return m; };
-    part(new THREE.CapsuleGeometry(.07, .66, 4, 10), 0x222a44, -.1, .42); part(new THREE.CapsuleGeometry(.07, .66, 4, 10), 0x222a44, .1, .42);
-    for (const x of [-.1, .1]) { const s = part(new THREE.BoxGeometry(.11, .06, .22), 0xf7f9fc, x, .03, {roughness: .6}); s.position.z = .04; } // sepatu
-    const torso = part(new THREE.CapsuleGeometry(.19, .32, 6, 14), shirt, 0, 1.08, {roughness: .85}); torso.scale.z = .62;
-    part(new THREE.CylinderGeometry(.05, .06, .08, 10), skin, 0, 1.36);
-    part(new THREE.SphereGeometry(.12, 20, 14), skin, 0, 1.5, {roughness: .6});
-    part(new THREE.TorusGeometry(.118, .018, 8, 24), 0xffffff, 0, 1.56).rotation.x = Math.PI / 2; // ikat kepala
-    const idle = part(new THREE.CapsuleGeometry(.04, .42, 4, 8), skin, -.25, 1.1); // lengan bebas, digeser ke sisi non-pemukul tiap frame
-    const arm = new THREE.Mesh(new THREE.CylinderGeometry(.04, .045, 1, 10), mat(skin)); scene.add(arm);
-    scene.add(g); return {g, arm, idle};
+    const g = new THREE.Group(), root = new THREE.Group(), spine = new THREE.Group(), head = new THREE.Group();
+    g.add(root); root.add(spine);
+    const pelvis = capsule(.12, .34, 0x222a44); pelvis.rotation.z = Math.PI / 2; root.add(pelvis); // celana
+    const torso = capsule(.18, .48, shirt, {roughness: .85}); torso.position.y = .27; torso.scale.z = .62; spine.add(torso);
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(.05, .06, .1, 10), mat(KULIT)); neck.position.y = .53; spine.add(neck);
+    head.position.y = .66; spine.add(head);
+    head.add(new THREE.Mesh(new THREE.SphereGeometry(.115, 20, 14), mat(KULIT, {roughness: .6})));
+    const band = new THREE.Mesh(new THREE.TorusGeometry(.113, .018, 8, 24), mat(0xffffff)); band.position.y = .05; band.rotation.x = Math.PI / 2; head.add(band); // ikat kepala
+    const nose = new THREE.Mesh(new THREE.SphereGeometry(.022, 8, 6), mat(KULIT)); nose.position.set(0, -.01, .11); head.add(nose); // arah pandang terlihat
+    const sh = {R: new THREE.Object3D(), L: new THREE.Object3D()}; sh.R.position.set(-.2, .46, 0); sh.L.position.set(.2, .46, 0); spine.add(sh.R, sh.L);
+    const arms = {R: makeLimbs(g, UA, FA, .045, .04, shirt, KULIT), L: makeLimbs(g, UA, FA, .045, .04, shirt, KULIT)}; // lengan atas berlengan baju
+    const palms = {R: new THREE.Mesh(new THREE.SphereGeometry(.042, 10, 8), mat(KULIT)), L: new THREE.Mesh(new THREE.SphereGeometry(.042, 10, 8), mat(KULIT))}; g.add(palms.R, palms.L);
+    const legs = {R: makeLimbs(g, TH, SH, .07, .055, 0x222a44, KULIT), L: makeLimbs(g, TH, SH, .07, .055, 0x222a44, KULIT)};
+    const shoes = {R: new THREE.Mesh(new THREE.BoxGeometry(.11, .07, .26), mat(0xf7f9fc, {roughness: .6})), L: new THREE.Mesh(new THREE.BoxGeometry(.11, .07, .26), mat(0xf7f9fc, {roughness: .6}))}; g.add(shoes.R, shoes.L);
+    scene.add(g);
+    return {g, root, spine, head, pelvis, sh, arms, palms, legs, shoes, st: null};
   }
   const chars = {h: makeChar(COLOR.h), g: makeChar(COLOR.g)};
-  chars.h.g.rotation.y = Math.PI; // menghadap meja
-  const fpArm = {h: null, g: null};
-  for (const k of ['h', 'g']) { fpArm[k] = new THREE.Mesh(new THREE.CylinderGeometry(.045, .05, 1, 10), mat(0xf1c27d)); scene.add(fpArm[k]); }
+  const fpArm = {}; // lengan orang pertama: lengan bawah tetap panjangnya, lengan atas sebagian besar di luar layar
+  for (const k of ['h', 'g']) { const g = new THREE.Group(); fpArm[k] = {g, ...makeLimbs(g, UA, FA, .05, .045, COLOR[k], KULIT), palm: new THREE.Mesh(new THREE.SphereGeometry(.045, 10, 8), mat(KULIT))}; g.add(fpArm[k].palm); scene.add(g); }
 
-  const up = new THREE.Vector3(0, 1, 0);
-  function setArm(arm, from, to) {
-    const d = new THREE.Vector3().subVectors(to, from), len = d.length();
-    arm.position.copy(from).addScaledVector(d, .5); arm.scale.y = len;
-    arm.quaternion.setFromUnitVectors(up, d.normalize());
+  const up = new THREE.Vector3(0, 1, 0), tA = V3(), tD = V3(), tN = V3();
+  // IK dua tulang: dari sendi A ke target T, sendi tengah J ditekuk ke arah pole. E = ujung (= T bila terjangkau).
+  function ik(A, T, a, b, pole, J, E) {
+    const L = tD.subVectors(T, A).length() || 1e-6, d = Math.min(L, (a + b) * .999);
+    tD.divideScalar(L);
+    const ca = clamp((a * a + d * d - b * b) / (2 * a * d), -1, 1), sa = Math.sqrt(1 - ca * ca);
+    tN.copy(pole).addScaledVector(tD, -pole.dot(tD)); if (tN.lengthSq() < 1e-8) tN.set(0, -1, 0); tN.normalize();
+    J.copy(A).addScaledVector(tD, a * ca).addScaledVector(tN, a * sa);
+    E.copy(A).addScaledVector(tD, d);
   }
-  const grip = b => new THREE.Vector3(b.x - .25 * Math.sin(b.r), b.y - .25 * Math.cos(b.r) * Math.cos(b.p), b.z + .25 * Math.cos(b.r) * Math.sin(b.p)); // ujung gagang
+  function bone(m, from, to) { m.position.addVectors(from, to).multiplyScalar(.5); m.quaternion.setFromUnitVectors(up, tA.subVectors(to, from).normalize()); }
+  const P = {sh: V3(), el: V3(), en: V3(), hip: V3(), kn: V3(), an: V3(), pole: V3(), tgt: V3(), look: V3()};
+  const ease = (dt, k) => 1 - Math.exp(-k * dt);
+
+  // Satu frame gerak karakter sisi k. hand = titik gagang (target tangan), isBh = backhand, ball = titik yang ditatap.
+  function poseChar(k, hand, hs, isBh, e, ball, play, dt) {
+    const c = chars[k], s = k === 'h' ? 1 : -1, base = k === 'h' ? Math.PI : 0;
+    const st = c.st || (c.st = {x: hand.x, z: s * (TL / 2 + .8), vx: 0, vz: 0, ph: 0, lean: .3, yaw: 0, hip: .84});
+    // 1. kaki: badan mengejar titik di belakang bat (pegas teredam kritis = langkah dengan sedikit lambat, seperti footwork)
+    const tx = hand.x - s * hs * (isBh ? -.08 : .3), tz = s * clamp(s * hand.z + .5, TL / 2 + .28, TL / 2 + 1.3), w = 8;
+    st.vx += (w * w * (tx - st.x) - 2 * w * st.vx) * dt; st.vz += (w * w * (tz - st.z) - 2 * w * st.vz) * dt;
+    st.x += st.vx * dt; st.z += st.vz * dt;
+    // 2. badan: jongkok untuk bola rendah, condong saat menjangkau, putar pinggang-bahu ke arah bat
+    const rx = (hand.x - st.x) * s, fz = -(hand.z - st.z) * s; // bat relatif badan: kanan pemain, ke depan
+    const low = clamp((1 - hand.y) / .4), far = clamp((fz - .3) / .5), bob = play ? .012 * Math.sin(performance.now() / 110) : 0;
+    st.hip += (.84 - .1 * low + Math.min(0, e.y) * .6 + bob - st.hip) * ease(dt, 10);
+    st.lean += (.2 + .4 * far + .25 * low - st.lean) * ease(dt, 10);
+    st.yaw += (clamp(-Math.atan2(rx, Math.max(.1, fz)) * .75, -1, 1) - st.yaw) * ease(dt, 18); // + = putar ke kiri pemain
+    c.root.position.set(st.x, 0, st.z); c.root.rotation.y = base + st.yaw * .4;
+    c.pelvis.position.y = st.hip; c.spine.position.y = st.hip;
+    c.spine.rotation.set(st.lean, st.yaw * .6, clamp(rx * .35, -.22, .22) * low, 'YXZ');
+    c.root.updateMatrixWorld(true);
+    // 3. lengan pemukul: bat di luar jangkauan = badan digeser sampai tangan sampai, jadi lengan tidak meregang
+    const hn = hs === 1 ? 'R' : 'L', fn = hs === 1 ? 'L' : 'R';
+    c.sh[hn].getWorldPosition(P.sh);
+    const dx = hand.x - P.sh.x, dy = hand.y - P.sh.y, dz = hand.z - P.sh.z, hz = Math.hypot(dx, dz) || 1e-6, max = (UA + FA) * .97;
+    if (Math.hypot(hz, dy) > max) {
+      const m = hz - Math.sqrt(Math.max(0, max * max - dy * dy));
+      st.x += dx / hz * m; st.z += dz / hz * m; c.root.position.set(st.x, 0, st.z); c.root.updateMatrixWorld(true); c.sh[hn].getWorldPosition(P.sh);
+    }
+    P.pole.set(s * hs * (isBh ? .8 : .7), isBh ? -.6 : -1, s * (isBh ? -.5 : .3)); // siku turun-keluar; backhand: siku ke depan-keluar
+    ik(P.sh, hand, UA, FA, P.pole, P.el, P.en);
+    bone(c.arms[hn].a, P.sh, P.el); bone(c.arms[hn].b, P.el, P.en); c.palms[hn].position.copy(P.en);
+    // 4. lengan bebas: ditekuk di depan perut, ikut putaran badan sebagai penyeimbang
+    c.sh[fn].getWorldPosition(P.sh);
+    c.spine.localToWorld(P.tgt.set(hs * .17, .14, .3));
+    P.pole.set(-s * hs * .6, -1, s * .4);
+    ik(P.sh, P.tgt, UA, FA * .85, P.pole, P.el, P.en);
+    bone(c.arms[fn].a, P.sh, P.el); bone(c.arms[fn].b, P.el, P.en); c.palms[fn].position.copy(P.en);
+    // 5. kaki: kuda-kuda lebar, kaki sisi pemukul sedikit di belakang; melangkah bergantian saat badan bergerak
+    const sp = Math.hypot(st.vx, st.vz), ux = sp > 1e-3 ? st.vx / sp : 0, uz = sp > 1e-3 ? st.vz / sp : 0;
+    st.ph += Math.min(sp, 3) * dt * 13;
+    const stride = Math.min(.14, sp * .2), lift = .06 * clamp(sp / .5);
+    for (const [n, side] of [['R', 1], ['L', -1]]) {
+      const q = st.ph + (side === 1 ? 0 : Math.PI);
+      c.root.localToWorld(P.hip.set(-side * .1, st.hip - .04, 0));
+      P.an.set(st.x + s * side * .23 + ux * stride * Math.cos(q), .07 + lift * Math.max(0, Math.sin(q)), st.z + s * (side === hs ? .1 : -.06) + uz * stride * Math.cos(q));
+      P.pole.set(s * side * .3, 0, -s);
+      ik(P.hip, P.an, TH, SH, P.pole, P.kn, P.en);
+      bone(c.legs[n].a, P.hip, P.kn); bone(c.legs[n].b, P.kn, P.en);
+      c.shoes[n].position.set(P.en.x, P.en.y - .035, P.en.z - s * .05); c.shoes[n].rotation.y = base;
+    }
+    // 6. kepala menatap bola
+    c.head.lookAt(P.look.copy(ball));
+  }
+  const grip = b => new THREE.Vector3(b.x - .21 * Math.sin(b.r), b.y - .21 * Math.cos(b.r) * Math.cos(b.p), b.z + .21 * Math.cos(b.r) * Math.sin(b.p)); // titik genggam di gagang
 
   // ---------- tingkat grafis ----------
   let cfg = GRAFIS.sedang, tex = null, envTex = null, composer = null, gtao = null, quality = '';
@@ -283,14 +352,17 @@ export function createScene(cv) {
       crowd.forEach((m, i) => { m.position.y = m.userData.y0 + (cheer > 0 ? Math.abs(Math.sin(tNow * 9 + (i >> 1))) * .12 * Math.min(1, cheer) : 0); });
       shake *= Math.exp(-14 * dt);
 
+      const pdt = Math.min(dt, .05); // jeda panjang tidak membuat pegas badan melompat
       for (const k of ['h', 'g']) {
-        const s = k === 'h' ? 1 : -1, b = F.bats[k], c = chars[k], e = F.eyes[k], ex = s * e.x;
-        const ow = new THREE.Vector3(ex + (b.x - ex) * .3, Math.min(0, e.y), s * (TL / 2 + 1)); // badan ikut kepala: condong dan jongkok
-        c.g.position.copy(ow);
-        const hs = F.hands[k] === 'L' ? -1 : 1; // lengan pemukul dari bahu tangan pemukul; backhand = lengan menyilang badan
-        c.idle.position.x = hs * .25;
-        setArm(c.arm, new THREE.Vector3(ow.x + s * hs * .26, 1.3 + ow.y, ow.z), grip(b));
-        setArm(fpArm[k], new THREE.Vector3(ex + s * (F.hands[k] === 'R' ? .3 : -.3), 1.15 + e.y, s * (EYE_Z - .05)), grip(b));
+        const s = k === 'h' ? 1 : -1, b = F.bats[k], e = F.eyes[k], ex = s * e.x, gp = grip(b);
+        const hs = F.hands[k] === 'L' ? -1 : 1; // backhand = lengan menyilang badan
+        P.look.set(live ? D.bx : 0, live ? D.by : TY + .2, live ? D.bz : -s * .5);
+        poseChar(k, gp, hs, bh[k], e, P.look, D.ph === 'play', pdt);
+        // orang pertama: bahu tetap di bawah kamera; lengan bawah tetap panjangnya, hanya lengan atas (di luar layar) yang menyesuaikan
+        const fa = fpArm[k]; P.sh.set(ex + s * hs * .3, 1.15 + e.y, s * (EYE_Z - .05));
+        const ua = Math.max(UA, P.sh.distanceTo(gp) - FA * .95);
+        ik(P.sh, gp, ua, FA, P.pole.set(s * hs * .7, -1, s * .3), P.el, P.en);
+        bone(fa.a, P.sh, P.el); fa.a.scale.y = ua / UA; bone(fa.b, P.el, P.en); fa.palm.position.copy(P.en);
       }
 
       const post = cfg.post && composer && F.views.length === 1; // pasca-proses hanya di Ultra
@@ -308,8 +380,8 @@ export function createScene(cv) {
         }
         for (const k of ['h', 'g']) {
           const mine = !tv && k === v.side;
-          chars[k].g.visible = chars[k].arm.visible = F.inGame && !mine;
-          fpArm[k].visible = F.inGame && mine;
+          chars[k].g.visible = F.inGame && !mine;
+          fpArm[k].g.visible = F.inGame && mine;
           bats[k].visible = F.inGame;
         }
         if (post) { renderer.setViewport(0, 0, W, H); composer.render(dt); } else renderer.render(scene, cam);
