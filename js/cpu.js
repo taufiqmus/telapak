@@ -12,15 +12,15 @@ import {clamp, fly, backhand, TY, NET_TOP, EYE_Y, EYE_Z} from './physics.js';
 
 export const LAWAN = [
   {id: 'rina', nama: 'Rina', gaya: 'Si tembok: sabar dan rapi, tapi lambat ke samping', kelemahan: 'Arahkan bola ke sudut bergantian',
-    mv: 3, acc: 11, react: .2, noise: .035, read: .85, bh: 1.1, risk: .4, power: [.8, 1.6], spin: .2, smash: 0, lob: .2, drop: 0, press: .5},
+    mv: 3, acc: 11, react: .2, noise: .042, read: .85, bh: 1.1, risk: .4, power: [.8, 1.6], spin: .2, smash: 0, lob: .2, drop: 0, press: .5},
   {id: 'bayu', nama: 'Bayu', gaya: 'Si pemutar: topspin dan backspin berat', kelemahan: 'Backhand-nya lemah',
-    mv: 3, acc: 11.5, react: .17, noise: .042, read: .7, bh: 1.9, risk: .5, power: [.9, 2], spin: .95, smash: .1, lob: 0, drop: .1, press: 1},
+    mv: 3, acc: 11.5, react: .17, noise: .05, read: .7, bh: 1.9, risk: .5, power: [.9, 2], spin: .95, smash: .1, lob: 0, drop: .1, press: 1},
   {id: 'dimas', nama: 'Dimas', gaya: 'Si cepat: menjangkau semua bola', kelemahan: 'Sering salah membaca spin',
-    mv: 3, acc: 11, react: .17, noise: .035, read: .35, bh: 1.1, risk: .4, power: [1, 2.6], spin: .5, smash: .3, lob: .05, drop: .05, press: 1},
+    mv: 3, acc: 11, react: .17, noise: .042, read: .35, bh: 1.1, risk: .4, power: [1, 2.6], spin: .5, smash: .3, lob: .05, drop: .05, press: 1},
   {id: 'sari', nama: 'Sari', gaya: 'Si penyerang: keras dan mepet garis', kelemahan: 'Sering memaksa, bola bisa keluar',
-    mv: 2, acc: 7.5, react: .22, noise: .04, read: .6, bh: 1.2, risk: 1, power: [1.4, 3.4], spin: .4, smash: .6, lob: 0, drop: 0, press: 1.3},
+    mv: 2, acc: 7.5, react: .22, noise: .048, read: .6, bh: 1.2, risk: 1, power: [1.4, 3.4], spin: .4, smash: .6, lob: 0, drop: 0, press: 1.3},
   {id: 'juara', nama: 'Pak Juara', gaya: 'Juara kampung: semua bisa', kelemahan: 'Goyah di reli panjang dan poin penentu',
-    mv: 3.3, acc: 12, react: .15, noise: .03, read: .85, bh: 1.15, risk: .5, power: [1.2, 3], spin: .7, smash: .5, lob: .05, drop: .1, press: 1.4}
+    mv: 3.3, acc: 12, react: .15, noise: .036, read: .85, bh: 1.15, risk: .5, power: [1.2, 3], spin: .7, smash: .5, lob: .05, drop: .1, press: 1.4}
 ];
 // Tanding cepat: level dari menu (Mudah 1.2, Sedang 2.2, Sulit 4).
 export const quick = lvl => ({id: 'cepat', nama: 'Komputer', kelemahan: '', mv: 2.6 + .2 * lvl, acc: 10 + .5 * lvl, react: .22 - .015 * lvl,
